@@ -1,0 +1,3 @@
+[submodule "libs/viking"]
+	path = libs/viking
+	url = https://github.com/oxxide216/viking

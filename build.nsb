@@ -1,0 +1,45 @@
+cflags = -Wall -Wextra -Ilibs/viking/include -Ilibs/viking/libs -Ilibs/viking/libs/winx/include -ggdb
+ldflags = -lX11 -lXext -lXrandr -lXfixes -lGLX -lvulkan -lm
+build_dir = build
+shader_spvs = $build_dir/shaders/text.vert.spv $build_dir/shaders/text.frag.spv
+
+[jet]
+src = src/jet/**.c
+deps = viking winx
+ghost_deps = $build_dir/shaders.c
+cflags = $cflags
+ldflags = $ldflags
+incpath = $build_dir
+
+[$build_dir/shaders.c]
+type = custom
+cmd = ./bundler $build_dir/shaders.c $shader_spvs
+src = shaders/*
+deps = bundler $shader_spvs
+
+[$build_dir/shaders/text.vert.spv]
+type = custom
+cmd = glslc -o $build_dir/shaders/text.vert.spv shaders/text.vert
+src = shaders/text.vert
+
+[$build_dir/shaders/text.frag.spv]
+type = custom
+cmd = glslc -o $build_dir/shaders/text.frag.spv shaders/text.frag
+src = shaders/text.frag
+
+[bundler]
+src = src/bundler/**.c
+cflags = $cflags
+incpath = $build_dir
+
+[viking]
+type = custom
+name_type = static_lib
+cmd = make -C libs/viking -B && cp libs/viking/libviking.* .
+src = libs/viking/src/**.c
+
+[winx]
+type = custom
+name_type = static_lib
+cmd = make CFLAGS=-DWINX_VULKAN -C libs/viking/libs/winx -B && cp libs/viking/libs/winx/libwinx.* .
+src = libs/viking/libs/winx/src/**.c
