@@ -69,27 +69,45 @@ i32 main(void) {
         } break;
 
         case WinxKeyCodeBackspace: {
-          buffer_remove_before_cursor(&buffer);
+          if (is_ctrl_pressed)
+            buffer_remove_word_before_cursor(&buffer);
+          else
+            buffer_remove_before_cursor(&buffer);
         } break;
 
         case WinxKeyCodeDelete: {
-          buffer_remove_at_cursor(&buffer);
+          if (is_ctrl_pressed)
+            buffer_remove_word_at_cursor(&buffer);
+          else
+            buffer_remove_at_cursor(&buffer);
         } break;
 
         case WinxKeyCodeLeft: {
-          buffer_move_left(&buffer);
+          if (is_ctrl_pressed)
+            buffer_move_left_word(&buffer);
+          else
+            buffer_move_left(&buffer);
         } break;
 
         case WinxKeyCodeRight: {
-          buffer_move_right(&buffer);
+          if (is_ctrl_pressed)
+            buffer_move_right_word(&buffer);
+          else
+            buffer_move_right(&buffer);
         } break;
 
         case WinxKeyCodeDown: {
-          buffer_move_down(&buffer);
+          if (is_ctrl_pressed)
+            buffer_move_down_paragraph(&buffer);
+          else
+            buffer_move_down(&buffer);
         } break;
 
         case WinxKeyCodeUp: {
-          buffer_move_up(&buffer);
+          if (is_ctrl_pressed)
+            buffer_move_up_paragraph(&buffer);
+          else
+            buffer_move_up(&buffer);
         } break;
 
         case WinxKeyCodeEqual: {

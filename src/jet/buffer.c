@@ -1,3 +1,5 @@
+#include <wctype.h>
+
 #include "buffer.h"
 
 Buffer buffer_make(void) {
@@ -91,26 +93,123 @@ void buffer_move_right(Buffer *buffer) {
   buffer->desired_col = buffer->cursor_col;
 }
 
+static void ensure_safe_cursor_col(Buffer *buffer) {
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  if (buffer->desired_col > line->len)
+    buffer->cursor_col = line->len;
+  else
+    buffer->cursor_col = buffer->desired_col;
+}
+
 void buffer_move_down(Buffer *buffer) {
   if (buffer->cursor_row + 1 < buffer->lines.len) {
     ++buffer->cursor_row;
-    Line *line = buffer->lines.items + buffer->cursor_row;
-    if (buffer->desired_col > line->len)
-      buffer->cursor_col = line->len;
-    else
-      buffer->cursor_col = buffer->desired_col;
+    ensure_safe_cursor_col(buffer);
   }
 }
 
 void buffer_move_up(Buffer *buffer) {
   if (buffer->cursor_row > 0) {
     --buffer->cursor_row;
-    Line *line = buffer->lines.items + buffer->cursor_row;
-    if (buffer->desired_col > line->len)
-      buffer->cursor_col = line->len;
-    else
-      buffer->cursor_col = buffer->desired_col;
+    ensure_safe_cursor_col(buffer);
   }
+}
+
+void buffer_remove_word_before_cursor(Buffer *buffer) {
+  bool found_word = false;
+
+  if (buffer->cursor_col == 0)
+    buffer_remove_before_cursor(buffer);
+
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  while (buffer->cursor_col > 0 &&
+         (!found_word ||
+          iswalnum(line->items[buffer->cursor_col - 1]))) {
+    if (iswalnum(line->items[buffer->cursor_col - 1]))
+      found_word = true;
+    --buffer->cursor_col;
+    buffer->desired_col = buffer->cursor_col;
+    DA_REMOVE_AT(*line, buffer->cursor_col);
+  }
+}
+
+void buffer_remove_word_at_cursor(Buffer *buffer) {
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  bool found_word = false;
+
+  if (buffer->cursor_col == line->len)
+    buffer_remove_at_cursor(buffer);
+
+  while (buffer->cursor_col < line->len &&
+         (!found_word ||
+          iswalnum(line->items[buffer->cursor_col]))) {
+    if (iswalnum(line->items[buffer->cursor_col]))
+      found_word = true;
+    DA_REMOVE_AT(*line, buffer->cursor_col);
+  }
+}
+
+void buffer_move_left_word(Buffer *buffer) {
+  bool found_word = false;
+
+  if (buffer->cursor_col == 0)
+    buffer_move_left(buffer);
+
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  while (buffer->cursor_col > 0 &&
+         (!found_word ||
+          iswalnum(line->items[buffer->cursor_col - 1]))) {
+    if (iswalnum(line->items[buffer->cursor_col - 1]))
+      found_word = true;
+    --buffer->cursor_col;
+    buffer->desired_col = buffer->cursor_col;
+  }
+}
+
+void buffer_move_right_word(Buffer *buffer) {
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  bool found_word = false;
+
+  if (buffer->cursor_col == line->len)
+    buffer_move_right(buffer);
+
+  line = buffer->lines.items + buffer->cursor_row;
+  while (buffer->cursor_col < line->len &&
+         (!found_word ||
+          iswalnum(line->items[buffer->cursor_col]))) {
+    if (iswalnum(line->items[buffer->cursor_col]))
+      found_word = true;
+    ++buffer->cursor_col;
+    buffer->desired_col = buffer->cursor_col;
+  }
+}
+
+void buffer_move_down_paragraph(Buffer *buffer) {
+  bool found_paragraph = false;
+
+  while (buffer->cursor_row + 1 < buffer->lines.len &&
+         (!found_paragraph ||
+          buffer->lines.items[buffer->cursor_row].len > 0)) {
+    if (buffer->lines.items[buffer->cursor_row].len > 0)
+      found_paragraph = true;
+    ++buffer->cursor_row;
+  }
+
+  ensure_safe_cursor_col(buffer);
+}
+
+void buffer_move_up_paragraph(Buffer *buffer) {
+  bool found_paragraph = false;
+
+  while (buffer->cursor_row > 0 &&
+         (!found_paragraph ||
+          buffer->lines.items[buffer->cursor_row - 1].len > 0)) {
+    if (buffer->lines.items[buffer->cursor_row - 1].len > 0)
+      found_paragraph = true;
+    --buffer->cursor_row;
+  }
+
+  ensure_safe_cursor_col(buffer);
 }
 
 void buffer_delete(Buffer *buffer) {

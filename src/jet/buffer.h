@@ -22,6 +22,8 @@ void   buffer_move_left(Buffer *buffer);
 void   buffer_move_right(Buffer *buffer);
 void   buffer_move_down(Buffer *buffer);
 void   buffer_move_up(Buffer *buffer);
+void   buffer_remove_word_before_cursor(Buffer *buffer);
+void   buffer_remove_word_at_cursor(Buffer *buffer);
 void   buffer_move_left_word(Buffer *buffer);
 void   buffer_move_right_word(Buffer *buffer);
 void   buffer_move_down_paragraph(Buffer *buffer);
