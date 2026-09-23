@@ -1,5 +1,3 @@
-#include <stdio.h>
-
 #include "buffer.h"
 
 Buffer buffer_make(void) {
@@ -12,6 +10,7 @@ void buffer_insert(Buffer *buffer, u32 _char) {
   Line *line = buffer->lines.items + buffer->cursor_row;
   DA_INSERT(*line, buffer->cursor_col, _char);
   ++buffer->cursor_col;
+  buffer->desired_col = buffer->cursor_col;
 }
 
 void buffer_insert_new_line(Buffer *buffer) {
@@ -26,6 +25,7 @@ void buffer_insert_new_line(Buffer *buffer) {
 
   ++buffer->cursor_row;
   buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
   DA_INSERT(buffer->lines, buffer->cursor_row, new_line);
 }
 
@@ -50,11 +50,13 @@ void buffer_remove_before_cursor(Buffer *buffer) {
   if (buffer->cursor_col > 0) {
     Line *line = buffer->lines.items + buffer->cursor_row;
     --buffer->cursor_col;
+    buffer->desired_col = buffer->cursor_col;
     DA_REMOVE_AT(*line, buffer->cursor_col);
   } else if (buffer->cursor_row > 0) {
     --buffer->cursor_row;
     Line *line = buffer->lines.items + buffer->cursor_row;
     buffer->cursor_col = line->len;
+    buffer->desired_col = buffer->cursor_col;
     merge_line_down(buffer, buffer->cursor_row);
   }
 }
@@ -68,22 +70,35 @@ void buffer_remove_at_cursor(Buffer *buffer) {
 }
 
 void buffer_move_left(Buffer *buffer) {
-  if (buffer->cursor_col > 0)
+  if (buffer->cursor_col > 0) {
     --buffer->cursor_col;
+  } else if (buffer->cursor_row > 0) {
+    --buffer->cursor_row;
+    Line *line = buffer->lines.items + buffer->cursor_row;
+    buffer->cursor_col = line->len;
+  }
+  buffer->desired_col = buffer->cursor_col;
 }
 
 void buffer_move_right(Buffer *buffer) {
   Line *line = buffer->lines.items + buffer->cursor_row;
-  if (buffer->cursor_col < line->len)
+  if (buffer->cursor_col < line->len) {
     ++buffer->cursor_col;
+  } else if (buffer->cursor_row + 1 < buffer->lines.len) {
+    ++buffer->cursor_row;
+    buffer->cursor_col = 0;
+  }
+  buffer->desired_col = buffer->cursor_col;
 }
 
 void buffer_move_down(Buffer *buffer) {
   if (buffer->cursor_row + 1 < buffer->lines.len) {
     ++buffer->cursor_row;
     Line *line = buffer->lines.items + buffer->cursor_row;
-    if (buffer->cursor_col > line->len)
+    if (buffer->desired_col > line->len)
       buffer->cursor_col = line->len;
+    else
+      buffer->cursor_col = buffer->desired_col;
   }
 }
 
@@ -91,8 +106,10 @@ void buffer_move_up(Buffer *buffer) {
   if (buffer->cursor_row > 0) {
     --buffer->cursor_row;
     Line *line = buffer->lines.items + buffer->cursor_row;
-    if (buffer->cursor_col > line->len)
+    if (buffer->desired_col > line->len)
       buffer->cursor_col = line->len;
+    else
+      buffer->cursor_col = buffer->desired_col;
   }
 }
 

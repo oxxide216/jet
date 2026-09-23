@@ -1,19 +1,20 @@
 cflags = -Wall -Wextra -Ilibs/viking/include -Ilibs/viking/libs -Ilibs/viking/libs/winx/include -ggdb
 ldflags = -lX11 -lXext -lXrandr -lXfixes -lGLX -lvulkan -lm
 build_dir = build
-shader_spvs = $build_dir/shaders/text.vert.spv $build_dir/shaders/text.frag.spv
+shader_spvs = $build_dir/shaders/text.vert.spv $build_dir/shaders/text.frag.spv $build_dir/shaders/sel.vert.spv $build_dir/shaders/sel.frag.spv
+fonts = fonts/MonaspaceNeon-Regular.otf
 
 [jet]
 src = src/jet/**.c
 deps = viking winx
-ghost_deps = $build_dir/shaders.c
+ghost_deps = $build_dir/assets.c
 cflags = $cflags
 ldflags = $ldflags
 incpath = $build_dir
 
-[$build_dir/shaders.c]
+[$build_dir/assets.c]
 type = custom
-cmd = ./bundler $build_dir/shaders.c $shader_spvs
+cmd = ./bundler $build_dir/assets.c $shader_spvs $fonts
 src = shaders/*
 deps = bundler $shader_spvs
 
@@ -26,6 +27,16 @@ src = shaders/text.vert
 type = custom
 cmd = glslc -o $build_dir/shaders/text.frag.spv shaders/text.frag
 src = shaders/text.frag
+
+[$build_dir/shaders/sel.vert.spv]
+type = custom
+cmd = glslc -o $build_dir/shaders/sel.vert.spv shaders/sel.vert
+src = shaders/sel.vert
+
+[$build_dir/shaders/sel.frag.spv]
+type = custom
+cmd = glslc -o $build_dir/shaders/sel.frag.spv shaders/sel.frag
+src = shaders/sel.frag
 
 [bundler]
 src = src/bundler/**.c

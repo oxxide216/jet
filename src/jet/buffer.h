@@ -10,6 +10,7 @@ typedef struct {
   Lines lines;
   u32   cursor_row;
   u32   cursor_col;
+  u32   desired_col;
 } Buffer;
 
 Buffer buffer_make(void);
@@ -21,6 +22,10 @@ void   buffer_move_left(Buffer *buffer);
 void   buffer_move_right(Buffer *buffer);
 void   buffer_move_down(Buffer *buffer);
 void   buffer_move_up(Buffer *buffer);
+void   buffer_move_left_word(Buffer *buffer);
+void   buffer_move_right_word(Buffer *buffer);
+void   buffer_move_down_paragraph(Buffer *buffer);
+void   buffer_move_up_paragraph(Buffer *buffer);
 void   buffer_delete(Buffer *buffer);
 
 #endif // BUFFER_H

@@ -1,13 +1,16 @@
 #include "shl/shl-defs.h"
 #include "viking/viking.h"
 #include "winx/event.h"
-#include "../../build/shaders.c"
+#include "../../build/assets.c"
 #include "text-renderer.h"
 #include "buffer.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 #define SHL_STR_IMPLEMENTATION
 #include "shl/shl-str.h"
+
+#define MAX_FONT_SCALE 240.0
+#define MIN_FONT_SCALE 8.0
 
 i32 main(void) {
   Winx *winx = winx_init();
@@ -21,13 +24,19 @@ i32 main(void) {
   VikExecutor *executor = vik_make_executor(instance);
 
   TextRenderer tr = tr_make(instance, executor,
+                            fonts_MonaspaceNeon_Regular_otf,
                             build_shaders_text_vert_spv,
-                            build_shaders_text_frag_spv);
+                            build_shaders_text_frag_spv,
+                            build_shaders_sel_vert_spv,
+                            build_shaders_sel_frag_spv);
   tr_resize(&tr, window->width, window->height);
 
   Buffer buffer = buffer_make();
 
+  f32 font_scale = 24.0;
+
   bool is_running = true;
+  bool is_ctrl_pressed = false;
 
   while (is_running) {
     WinxEvent event;
@@ -44,8 +53,19 @@ i32 main(void) {
       case WinxEventKindKeyPress:
       case WinxEventKindKeyHold: {
         switch (event.as.key.key_code) {
+        case WinxKeyCodeLeftControl: {
+          is_ctrl_pressed = true;
+        } break;
+
         case WinxKeyCodeEnter: {
-          buffer_insert_new_line(&buffer);
+          if (!is_ctrl_pressed)
+            buffer_insert_new_line(&buffer);
+        } break;
+
+        case WinxKeyCodeTab: {
+          if (!is_ctrl_pressed)
+            for (u32 i = 0; i < 2; ++i)
+              buffer_insert(&buffer, ' ');
         } break;
 
         case WinxKeyCodeBackspace: {
@@ -72,12 +92,28 @@ i32 main(void) {
           buffer_move_up(&buffer);
         } break;
 
+        case WinxKeyCodeEqual: {
+          if (is_ctrl_pressed && font_scale < MAX_FONT_SCALE)
+            font_scale += 1.0;
+        } break;
+
+        case WinxKeyCodeMinus: {
+          if (is_ctrl_pressed && font_scale > MIN_FONT_SCALE)
+            font_scale -= 1.0;
+        } break;
+
         default: break;
         }
       } break;
 
+      case WinxEventKindKeyRelease: {
+        if (event.as.key.key_code == WinxKeyCodeLeftControl)
+          is_ctrl_pressed = false;
+      } break;
+
       case WinxEventKindChar: {
-        buffer_insert(&buffer, event.as._char._char);
+        if (!is_ctrl_pressed)
+          buffer_insert(&buffer, event.as._char._char);
       } break;
 
       default: break;
@@ -88,10 +124,15 @@ i32 main(void) {
       winx_draw(window);
       continue;
     }
-    tr_begin_frame(&tr);
+    tr_begin_frame(&tr, font_scale,
+                   buffer.cursor_row, buffer.cursor_col,
+                   buffer.cursor_row, buffer.cursor_col + 1);
+    tr_set_bg_color(&tr, 0.0, 0.0, 0.0);
+    tr_set_fg_color(&tr, 1.0, 1.0, 1.0);
     for (u32 i = 0; i < buffer.lines.len; ++i) {
       Line *line = buffer.lines.items + i;
-      tr_draw_text(&tr, line->items, line->len, 15.0, 15.0 * (i + 1), 1.0, 1.0, 1.0);
+      tr_draw_line(&tr, line->items, line->len,
+                   10.0, 10.0 + font_scale * i);
     }
     tr_end_frame(&tr);
     vik_end_frame(executor);

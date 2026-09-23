@@ -71,7 +71,7 @@ i32 main(i32 argc, char **argv) {
     u32 len = strlen(argv[i]);
     fprintf(output_file, "char ");
     for (u32 j = 0; j < len; ++j) {
-      if (argv[i][j] == '/' || argv[i][j] == '.')
+      if (argv[i][j] == '/' || argv[i][j] == '.' || argv[i][j] == '-')
         fputc('_', output_file);
       else
         fputc(argv[i][j], output_file);
@@ -90,14 +90,14 @@ i32 main(i32 argc, char **argv) {
     u32 len = strlen(argv[i]);
     fprintf(output_file, "Str ");
     for (u32 j = 0; j < len; ++j) {
-      if (argv[i][j] == '/' || argv[i][j] == '.')
+      if (argv[i][j] == '/' || argv[i][j] == '.' || argv[i][j] == '-')
         fputc('_', output_file);
       else
         fputc(argv[i][j], output_file);
     }
     fprintf(output_file, " = { ");
     for (u32 j = 0; j < len; ++j) {
-      if (argv[i][j] == '/' || argv[i][j] == '.')
+      if (argv[i][j] == '/' || argv[i][j] == '.' || argv[i][j] == '-')
         fputc('_', output_file);
       else
         fputc(argv[i][j], output_file);
