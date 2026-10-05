@@ -1,22 +1,22 @@
+// TODO: scroll
+
 #include "shl/shl-defs.h"
 #include "viking/viking.h"
 #include "winx/event.h"
 #include "../../build/assets.c"
 #include "text-renderer.h"
 #include "shape-renderer.h"
+#include "editor.h"
 #include "buffer.h"
+#include "provider.h"
+// Customize your editor here!
 #include "config.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 #define SHL_STR_IMPLEMENTATION
 #include "shl/shl-str.h"
 
-typedef enum {
-  JetModeEditor = 0,
-  JetModeCommandPalette,
-} JetMode;
-
-i32 main(void) {
+i32 main(i32 argc, char **argv) {
   Winx *winx = winx_init();
   WinxWindow *window = winx_init_window(winx, STR_LIT("Jet"),
                                         1600, 900,
@@ -50,17 +50,30 @@ i32 main(void) {
                             build_shaders_circle_frag_spv);
   sr_resize(&sr, window->width, window->height);
 
-  Buffer editor_buffer = buffer_make();
-  Buffer palette_buffer = buffer_make();
-  Buffer *current_buffer = &editor_buffer;
+  Editor editor = {0};
 
-  JetMode mode = JetModeEditor;
+  editor.editor_buffer = buffer_make();
+  editor.palette_buffer = buffer_make();
+  editor.current_buffer = &editor.editor_buffer;
 
-  f32 font_scale = 24.0;
+  editor.provider = &command_provider;
+
+  editor.mode = JetModeEditor;
+
+  editor.font_scale = 24.0;
+
+  if (argc > 1) {
+    buffer_read_file(editor.current_buffer, argv[1]);
+    editor.current_file_path = strdup(argv[1]);
+  }
 
   bool is_running = true;
+  bool is_shift_pressed = false;
   bool is_ctrl_pressed = false;
   bool is_alt_pressed = false;
+
+  tr_set_bg_color(&tr, BG_COLOR);
+  tr_set_fg_color(&tr, FG_COLOR);
 
   while (is_running) {
     WinxEvent event;
@@ -79,6 +92,10 @@ i32 main(void) {
       case WinxEventKindKeyPress:
       case WinxEventKindKeyHold: {
         switch (event.as.key.key_code) {
+        case WinxKeyCodeLeftShift: {
+          is_shift_pressed = true;
+        } break;
+
         case WinxKeyCodeLeftControl: {
           is_ctrl_pressed = true;
         } break;
@@ -88,104 +105,170 @@ i32 main(void) {
         } break;
 
         case WinxKeyCodeEnter: {
-          if (!is_ctrl_pressed && mode == JetModeEditor)
-            buffer_insert_new_line(current_buffer);
+          if (!is_ctrl_pressed) {
+            if (editor.mode == JetModeEditor) {
+              buffer_insert_new_line(editor.current_buffer);
+            } else if (editor.mode == JetModeCommandPalette) {
+              if (editor.selected_option < editor.options.len) {
+                if (editor.provider->execute(&editor, editor.selected_option)) {
+                  editor.current_buffer = &editor.editor_buffer;
+                  editor.mode = JetModeEditor;
+                }
+              }
+            }
+          }
         } break;
 
         case WinxKeyCodeTab: {
-          if (!is_ctrl_pressed && mode == JetModeEditor)
-            for (u32 i = 0; i < SPACES_PER_TAB; ++i)
-              buffer_insert(current_buffer, ' ');
+          if (!is_ctrl_pressed) {
+            if (editor.mode == JetModeEditor) {
+              for (u32 i = 0; i < SPACES_PER_TAB; ++i)
+                buffer_insert(editor.current_buffer, ' ');
+            } else if (editor.mode == JetModeCommandPalette) {
+              if (editor.selected_option < editor.options.len) {
+                buffer_delete_line(editor.current_buffer);
+                WideStr *option = editor.options.items + editor.selected_option;
+                for (u32 i = 0; i < option->len; ++i)
+                  buffer_insert(editor.current_buffer, option->ptr[i]);
+                editor.selected_option = 0;
+              }
+            }
+          }
         } break;
 
         case WinxKeyCodeBackspace: {
           if (is_ctrl_pressed)
-            buffer_remove_word_before_cursor(current_buffer);
+            buffer_remove_word_before_cursor(editor.current_buffer);
           else
-            buffer_remove_before_cursor(current_buffer);
+            buffer_remove_before_cursor(editor.current_buffer);
         } break;
 
         case WinxKeyCodeDelete: {
           if (is_ctrl_pressed)
-            buffer_remove_word_at_cursor(current_buffer);
+            buffer_remove_word_at_cursor(editor.current_buffer);
           else
-            buffer_remove_at_cursor(current_buffer);
+            buffer_remove_at_cursor(editor.current_buffer);
         } break;
 
         case WinxKeyCodeLeft: {
           if (is_ctrl_pressed)
-            buffer_move_left_word(current_buffer);
+            buffer_move_left_word(editor.current_buffer);
           else
-            buffer_move_left(current_buffer);
+            buffer_move_left(editor.current_buffer);
         } break;
 
         case WinxKeyCodeRight: {
           if (is_ctrl_pressed)
-            buffer_move_right_word(current_buffer);
+            buffer_move_right_word(editor.current_buffer);
           else
-            buffer_move_right(current_buffer);
+            buffer_move_right(editor.current_buffer);
         } break;
 
         case WinxKeyCodeDown: {
-          if (mode == JetModeEditor) {
+          if (editor.mode == JetModeEditor) {
             if (is_ctrl_pressed)
-              buffer_move_down_paragraph(current_buffer);
+              buffer_move_down_paragraph(editor.current_buffer);
             else
-              buffer_move_down(current_buffer);
+              buffer_move_down(editor.current_buffer);
+          } else if (editor.mode == JetModeCommandPalette) {
+            if (editor.selected_option + 1 < editor.options.len)
+              ++editor.selected_option;
+            else
+              editor.selected_option = 0;
           }
         } break;
 
         case WinxKeyCodeUp: {
-          if (mode == JetModeEditor) {
+          if (editor.mode == JetModeEditor) {
             if (is_ctrl_pressed)
-              buffer_move_up_paragraph(current_buffer);
+              buffer_move_up_paragraph(editor.current_buffer);
             else
-              buffer_move_up(current_buffer);
+              buffer_move_up(editor.current_buffer);
+          } else if (editor.mode == JetModeCommandPalette) {
+            if (editor.selected_option > 0)
+              --editor.selected_option;
+            else if (editor.options.len > 0)
+              editor.selected_option = editor.options.len - 1;
           }
         } break;
 
         case WinxKeyCodeEqual: {
-          if (is_ctrl_pressed && font_scale < MAX_FONT_SCALE)
-            font_scale += 1.0;
+          if (is_ctrl_pressed && editor.font_scale < MAX_FONT_SCALE)
+            editor.font_scale += 1.0;
         } break;
 
         case WinxKeyCodeMinus: {
-          if (is_ctrl_pressed && font_scale > MIN_FONT_SCALE)
-            font_scale -= 1.0;
+          if (is_ctrl_pressed && editor.font_scale > MIN_FONT_SCALE)
+            editor.font_scale -= 1.0;
         } break;
 
         case WinxKeyCodeP: {
           if (is_ctrl_pressed) {
-            if (mode == JetModeEditor) {
-              palette_buffer.lines.items[0].len = 0;
-              palette_buffer.cursor_col = 0;
-              current_buffer = &palette_buffer;
-              mode = JetModeCommandPalette;
-            } else if (mode == JetModeCommandPalette) {
-              current_buffer = &editor_buffer;
-              mode = JetModeEditor;
+            if (editor.mode == JetModeEditor) {
+              editor.current_buffer = &editor.palette_buffer;
+              editor.provider = &command_provider;
+              editor.selected_option = 0;
+              editor.mode = JetModeCommandPalette;
+              buffer_delete_line(editor.current_buffer);
+            } else if (editor.mode == JetModeCommandPalette) {
+              editor.current_buffer = &editor.editor_buffer;
+              editor.mode = JetModeEditor;
             }
           }
         } break;
 
         case WinxKeyCodeA: {
           if (is_ctrl_pressed)
-            buffer_goto_line_begin(current_buffer);
+            buffer_goto_line_begin(editor.current_buffer);
           else if (is_alt_pressed)
-            buffer_goto_buffer_begin(current_buffer);
+            buffer_goto_buffer_begin(editor.current_buffer);
         } break;
 
         case WinxKeyCodeE: {
           if (is_ctrl_pressed)
-            buffer_goto_line_end(current_buffer);
+            buffer_goto_line_end(editor.current_buffer);
           else if (is_alt_pressed)
-            buffer_goto_buffer_end(current_buffer);
+            buffer_goto_buffer_end(editor.current_buffer);
+        } break;
+
+        case WinxKeyCodeO: {
+          if (is_ctrl_pressed && editor.mode == JetModeEditor) {
+            editor.current_buffer = &editor.palette_buffer;
+            editor.provider = &open_file_provider;
+            editor.selected_option = 0;
+            editor.mode = JetModeCommandPalette;
+            buffer_delete_line(editor.current_buffer);
+          }
+        } break;
+
+        case WinxKeyCodeS: {
+          if (is_ctrl_pressed && editor.mode == JetModeEditor) {
+            if (is_shift_pressed || !editor.current_file_path) {
+              editor.current_buffer = &editor.palette_buffer;
+              editor.provider = &save_file_provider;
+              editor.selected_option = 0;
+              editor.mode = JetModeCommandPalette;
+              buffer_delete_line(editor.current_buffer);
+            } else {
+              buffer_write_file(editor.current_buffer, editor.current_file_path);
+            }
+          }
+        } break;
+
+        case WinxKeyCodeN: {
+          if (is_ctrl_pressed) {
+            buffer_reset(&editor.editor_buffer);
+            if (editor.current_file_path) {
+              free(editor.current_file_path);
+              editor.current_file_path = NULL;
+            }
+          }
         } break;
 
         case WinxKeyCodeEscape: {
-          if (mode == JetModeCommandPalette) {
-            current_buffer = &editor_buffer;
-            mode = JetModeEditor;
+          if (editor.mode == JetModeCommandPalette) {
+            editor.current_buffer = &editor.editor_buffer;
+            editor.mode = JetModeEditor;
           }
         } break;
 
@@ -194,7 +277,9 @@ i32 main(void) {
       } break;
 
       case WinxEventKindKeyRelease: {
-        if (event.as.key.key_code == WinxKeyCodeLeftControl)
+        if (event.as.key.key_code == WinxKeyCodeLeftShift)
+          is_shift_pressed = false;
+        else if (event.as.key.key_code == WinxKeyCodeLeftControl)
           is_ctrl_pressed = false;
         else if (event.as.key.key_code == WinxKeyCodeLeftAlt)
           is_alt_pressed = false;
@@ -202,7 +287,7 @@ i32 main(void) {
 
       case WinxEventKindChar: {
         if (!is_ctrl_pressed && !is_alt_pressed)
-          buffer_insert(current_buffer, event.as._char._char);
+          buffer_insert(editor.current_buffer, event.as._char._char);
       } break;
 
       default: break;
@@ -213,59 +298,106 @@ i32 main(void) {
       winx_draw(window);
       continue;
     }
-    tr_begin_frame(&tr, font_scale,
-                   editor_buffer.cursor_row,
-                   editor_buffer.cursor_col,
-                   editor_buffer.cursor_row,
-                   editor_buffer.cursor_col + 1);
-    tr_begin_frame(&ptr, font_scale,
-                   palette_buffer.cursor_row,
-                   palette_buffer.cursor_col,
-                   palette_buffer.cursor_row,
-                   palette_buffer.cursor_col + 1);
+    tr_begin_frame(&ptr, editor.font_scale,
+                   editor.palette_buffer.cursor_row,
+                   editor.palette_buffer.cursor_col,
+                   editor.palette_buffer.cursor_row,
+                   editor.palette_buffer.cursor_col + 1);
     sr_begin_frame(&sr);
-    tr_set_bg_color(&tr, BG_COLOR);
-    tr_set_fg_color(&tr, FG_COLOR);
-    for (u32 i = 0; i < editor_buffer.lines.len; ++i) {
-      Line *line = editor_buffer.lines.items + i;
+    tr_begin_frame(&tr, editor.font_scale,
+                   editor.editor_buffer.cursor_row,
+                   editor.editor_buffer.cursor_col,
+                   editor.editor_buffer.cursor_row,
+                   editor.editor_buffer.cursor_col + 1);
+    for (u32 i = 0; i < editor.editor_buffer.lines.len; ++i) {
+      Line *line = editor.editor_buffer.lines.items + i;
       tr_draw_line(&tr, line->items, line->len,
                    BUFFER_PADDING,
-                   BUFFER_PADDING + font_scale * i);
+                   BUFFER_PADDING + editor.font_scale * i);
     }
-    if (mode == JetModeCommandPalette) {
-      Line *line = palette_buffer.lines.items;
+    if (editor.mode == JetModeCommandPalette) {
+      WideStr line = buffer_get_current_line(editor.current_buffer);
+
+      tr_set_bg_color(&ptr, BG_COLOR);
+      tr_set_fg_color(&ptr, FG_COLOR);
+
+      // Shadow
+      sr_draw_rounded_rect(&sr,
+                           window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_SHADOW_OFFSET,
+                           window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + PALETTE_SHADOW_OFFSET,
+                           window->width * PALETTE_WIDTH_FACTOR,
+                           window->height * PALETTE_HEIGHT_FACTOR,
+                           PALETTE_BORDER_RADIUS, SHADOW_COLOR, true);
+      // Border
       sr_draw_rounded_rect(&sr,
                            window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
                            window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5,
                            window->width * PALETTE_WIDTH_FACTOR,
                            window->height * PALETTE_HEIGHT_FACTOR,
-                           PALETTE_BORDER_RADIUS, FG_COLOR);
+                           PALETTE_BORDER_RADIUS, FG_COLOR,
+                           PALETTE_ALPHA == 1.0 ? PALETTE_ALPHA : PALETTE_ALPHA / 2.0,
+                           false);
+      // Inner
       sr_draw_rounded_rect(&sr,
                            window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
                            window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
                            window->width * PALETTE_WIDTH_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
                            window->height * PALETTE_HEIGHT_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
-                           PALETTE_BORDER_RADIUS, BG_COLOR);
+                           PALETTE_BORDER_RADIUS - PALETTE_BORDER_WIDTH, BG_COLOR, PALETTE_ALPHA,
+                           false);
       sr_draw_rect(&sr,
                    window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
-                   window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 2.0 + PALETTE_BORDER_WIDTH + font_scale,
+                   window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 2.0 + PALETTE_BORDER_WIDTH + editor.font_scale,
                    window->width * PALETTE_WIDTH_FACTOR,
                    PALETTE_BORDER_WIDTH,
-                   FG_COLOR);
-      tr_draw_text(&tr, line->items, line->len,
+                   FG_COLOR, PALETTE_ALPHA);
+      tr_draw_line(&ptr, line.ptr, line.len,
                    window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH,
                    window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH);
+
+      editor.provider->free_opts(editor.options);
+      editor.options = editor.provider->get_opts(line);
+
+      // TODO: scroll here too
+      for (u32 i = 0; i < editor.options.len; ++i) {
+        WideStr *option = editor.options.items + i;
+        f32 x = window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH;
+        f32 y = window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 3.0 + PALETTE_BORDER_WIDTH + editor.font_scale * (i + 1);
+
+        if (window->height - y - editor.font_scale < window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH)
+          break;
+
+        if (i == editor.selected_option) {
+          tr_set_bg_color(&ptr, FG_COLOR);
+          tr_set_fg_color(&ptr, BG_COLOR);
+
+          sr_draw_rect(&sr,
+                       window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
+                       y,
+                       window->width * PALETTE_WIDTH_FACTOR,
+                       editor.font_scale,
+                       FG_COLOR, PALETTE_ALPHA);
+        } else {
+          tr_set_bg_color(&ptr, BG_COLOR);
+          tr_set_fg_color(&ptr, FG_COLOR);
+        }
+
+        tr_draw_text(&ptr, option->ptr, option->len, x, y);
+      }
     }
+    tr_end_frame(&tr);
     sr_end_frame(&sr);
     tr_end_frame(&ptr);
-    tr_end_frame(&tr);
     vik_end_frame(executor);
 
     winx_draw(window);
   }
 
-  buffer_delete(&palette_buffer);
-  buffer_delete(&editor_buffer);
+  if (editor.current_file_path)
+    free(editor.current_file_path);
+
+  buffer_delete(&editor.palette_buffer);
+  buffer_delete(&editor.editor_buffer);
 
   sr_delete(&sr);
   tr_delete(&ptr);

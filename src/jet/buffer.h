@@ -2,6 +2,7 @@
 #define BUFFER_H
 
 #include "shl/shl-defs.h"
+#include "common.h"
 
 typedef Da(u32) Line;
 typedef Da(Line) Lines;
@@ -14,6 +15,7 @@ typedef struct {
 } Buffer;
 
 Buffer buffer_make(void);
+void   buffer_reset(Buffer *buffer);
 void   buffer_insert(Buffer *buffer, u32 _char);
 void   buffer_insert_new_line(Buffer *buffer);
 void   buffer_remove_before_cursor(Buffer *buffer);
@@ -33,5 +35,11 @@ void   buffer_goto_line_end(Buffer *buffer);
 void   buffer_goto_buffer_begin(Buffer *buffer);
 void   buffer_goto_buffer_end(Buffer *buffer);
 void   buffer_delete(Buffer *buffer);
+void   buffer_delete_line(Buffer *buffer);
+
+void buffer_read_file(Buffer *buffer, char *path);
+void buffer_write_file(Buffer *buffer, char *path);
+
+WideStr buffer_get_current_line(Buffer *buffer);
 
 #endif // BUFFER_H

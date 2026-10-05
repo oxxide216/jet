@@ -1,11 +1,24 @@
+#include <stdio.h>
 #include <wctype.h>
 
 #include "buffer.h"
+#include "common.h"
 
 Buffer buffer_make(void) {
   Buffer buffer = {0};
   DA_APPEND(buffer.lines, (Line) {0});
   return buffer;
+}
+
+void buffer_reset(Buffer *buffer) {
+  for (u32 i = 1; i < buffer->lines.len; ++i)
+    if (buffer->lines.items[i].items)
+      free(buffer->lines.items[i].items);
+  buffer->lines.len = 1;
+  buffer->lines.items[0].len = 0;
+  buffer->cursor_row = 0;
+  buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
 }
 
 void buffer_insert(Buffer *buffer, u32 _char) {
@@ -250,4 +263,55 @@ void buffer_delete(Buffer *buffer) {
   }
   if (buffer->lines.items)
     free(buffer->lines.items);
+}
+
+void buffer_delete_line(Buffer *buffer) {
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  line->len = 0;
+  buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
+}
+
+void buffer_read_file(Buffer *buffer, char *path) {
+  FILE *file = fopen(path, "r");
+  if (!file)
+    return;
+
+  u32 wide_char;
+  while ((wide_char = get_wide_char(file)) != (u32) -1) {
+    if (wide_char == U'\n')
+      buffer_insert_new_line(buffer);
+    else
+      buffer_insert(buffer, wide_char);
+  }
+
+  fclose(file);
+
+  buffer->cursor_row = 0;
+  buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
+}
+
+void buffer_write_file(Buffer *buffer, char *path) {
+  FILE *file = fopen(path, "w");
+  if (!file)
+    return;
+
+  for (u32 i = 0; i < buffer->lines.len; ++i) {
+    Line *line = buffer->lines.items + i;
+    if (i > 0)
+      put_wide_char('\n', file);
+    for (u32 j = 0; j < line->len; ++j)
+      put_wide_char(line->items[j], file);
+  }
+
+  fclose(file);
+}
+
+WideStr buffer_get_current_line(Buffer *buffer) {
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  return (WideStr) {
+    line->items,
+    line->len,
+  };
 }

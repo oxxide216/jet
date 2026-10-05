@@ -2,13 +2,13 @@
 
 static VikAttr shape_attrs[] = {
   VikAttrVec2,
-  VikAttrVec3,
+  VikAttrVec4,
 };
 
 static VikAttr circle_attrs[] = {
   VikAttrVec2,
   VikAttrVec2,
-  VikAttrVec3,
+  VikAttrVec4,
 };
 
 ShapeRenderer sr_make(VikInstance *instance,
@@ -56,7 +56,7 @@ void sr_begin_frame(ShapeRenderer *sr) {
 void sr_draw_rect(ShapeRenderer *sr,
                   f32 x, f32 y,
                   f32 width, f32 height,
-                  f32 r, f32 g, f32 b) {
+                  f32 r, f32 g, f32 b, f32 a) {
   u32 indices[] = { 0, 1, 2, 2, 1, 3 };
   for (u32 i = 0; i < ARRAY_LEN(indices); ++i) {
     indices[i] += sr->shape_vertices.len;
@@ -64,10 +64,10 @@ void sr_draw_rect(ShapeRenderer *sr,
   }
 
   ShapeVertex vertices[] = {
-    { x,         y,          r, g, b },
-    { x + width, y,          r, g, b },
-    { x,         y + height, r, g, b },
-    { x + width, y + height, r, g, b },
+    { x,         y,          r, g, b, a },
+    { x + width, y,          r, g, b, a },
+    { x,         y + height, r, g, b, a },
+    { x + width, y + height, r, g, b, a },
   };
   for (u32 i = 0; i < ARRAY_LEN(vertices); ++i)
     DA_APPEND(sr->shape_vertices, vertices[i]);
@@ -75,8 +75,9 @@ void sr_draw_rect(ShapeRenderer *sr,
 
 void sr_draw_rounded_rect(ShapeRenderer *sr,
                           f32 x, f32 y,
-                          f32 width, f32 height,
-                          f32 radius, f32 r, f32 g, f32 b) {
+                          f32 width, f32 height, f32 radius,
+                          f32 r, f32 g, f32 b, f32 a,
+                                   bool is_shadow) {
   f32 ix = x + radius;
   f32 iy = y + radius;
   f32 iwidth = width - radius * 2.0;
@@ -89,10 +90,10 @@ void sr_draw_rounded_rect(ShapeRenderer *sr,
   }
 
   ShapeVertex vertices0[] = {
-    { x,         iy,           r, g, b },
-    { x + width, iy,           r, g, b },
-    { x,         iy + iheight, r, g, b },
-    { x + width, iy + iheight, r, g, b },
+    { x,         iy,           r, g, b, a },
+    { x + width, iy,           r, g, b, a },
+    { x,         iy + iheight, r, g, b, a },
+    { x + width, iy + iheight, r, g, b, a },
   };
   for (u32 i = 0; i < ARRAY_LEN(vertices0); ++i)
     DA_APPEND(sr->shape_vertices, vertices0[i]);
@@ -104,10 +105,10 @@ void sr_draw_rounded_rect(ShapeRenderer *sr,
   }
 
   ShapeVertex vertices1[] = {
-    { ix,          y,          r, g, b },
-    { ix + iwidth, y,          r, g, b },
-    { ix,          y + height, r, g, b },
-    { ix + iwidth, y + height, r, g, b },
+    { ix,          y,          r, g, b, a },
+    { ix + iwidth, y,          r, g, b, a },
+    { ix,          y + height, r, g, b, a },
+    { ix + iwidth, y + height, r, g, b, a },
   };
   for (u32 i = 0; i < ARRAY_LEN(vertices1); ++i)
     DA_APPEND(sr->shape_vertices, vertices1[i]);
@@ -129,7 +130,7 @@ void sr_draw_rounded_rect(ShapeRenderer *sr,
 
   f32 d = radius * 2.0;
 
-  for (u32 i = 0; i < 4; ++i) {
+  for (u32 i = is_shadow; i < 4; ++i) {
     u32 indices2[] = { 0, 1, 2, 2, 1, 3 };
     for (u32 j = 0; j < ARRAY_LEN(indices2); ++j) {
       indices2[j] += sr->circle_vertices.len;
@@ -142,10 +143,10 @@ void sr_draw_rounded_rect(ShapeRenderer *sr,
     f32 *v = vs[i];
 
     CircleVertex vertices2[] = {
-      { ox,     oy,     u[0], v[0], r, g, b },
-      { ox + d, oy,     u[1], v[1], r, g, b },
-      { ox,     oy + d, u[2], v[2], r, g, b },
-      { ox + d, oy + d, u[3], v[3], r, g, b },
+      { ox,     oy,     u[0], v[0], r, g, b, a },
+      { ox + d, oy,     u[1], v[1], r, g, b, a },
+      { ox,     oy + d, u[2], v[2], r, g, b, a },
+      { ox + d, oy + d, u[3], v[3], r, g, b, a },
     };
     for (u32 j = 0; j < ARRAY_LEN(vertices2); ++j)
       DA_APPEND(sr->circle_vertices, vertices2[j]);

@@ -10,7 +10,7 @@ typedef struct {
 
 typedef struct {
   f32 x, y;
-  f32 r, g, b;
+  f32 r, g, b, a;
 } ShapeVertex;
 
 typedef Da(ShapeVertex) ShapeVertices;
@@ -18,7 +18,7 @@ typedef Da(ShapeVertex) ShapeVertices;
 typedef struct {
   f32 x, y;
   f32 u, v;
-  f32 r, g, b;
+  f32 r, g, b, a;
 } CircleVertex;
 
 typedef Da(CircleVertex) CircleVertices;
@@ -52,11 +52,12 @@ void          sr_begin_frame(ShapeRenderer *sr);
 void          sr_draw_rect(ShapeRenderer *sr,
                            f32 x, f32 y,
                            f32 width, f32 height,
-                           f32 r, f32 g, f32 b);
+                           f32 r, f32 g, f32 b, f32 a);
 void          sr_draw_rounded_rect(ShapeRenderer *sr,
                                    f32 x, f32 y,
-                                   f32 width, f32 height,
-                                   f32 radius, f32 r, f32 g, f32 b);
+                                   f32 width, f32 height, f32 radius,
+                                   f32 r, f32 g, f32 b, f32 a,
+                                   bool is_shadow);
 void          sr_end_frame(ShapeRenderer *sr);
 void          sr_delete(ShapeRenderer *sr);
 
