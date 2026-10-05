@@ -1,7 +1,7 @@
 cflags = -Wall -Wextra -Ilibs/viking/include -Ilibs/viking/libs -Ilibs/viking/libs/winx/include -ggdb
 ldflags = -lX11 -lXext -lXrandr -lXfixes -lGLX -lvulkan -lm
 build_dir = build
-shader_spvs = $build_dir/shaders/text.vert.spv $build_dir/shaders/text.frag.spv $build_dir/shaders/sel.vert.spv $build_dir/shaders/sel.frag.spv
+shader_spvs = $build_dir/shaders/text.vert.spv $build_dir/shaders/text.frag.spv $build_dir/shaders/sel.vert.spv $build_dir/shaders/sel.frag.spv $build_dir/shaders/shape.vert.spv $build_dir/shaders/shape.frag.spv $build_dir/shaders/circle.vert.spv $build_dir/shaders/circle.frag.spv
 fonts = fonts/MonaspaceNeon-Regular.otf
 
 [jet]
@@ -37,6 +37,26 @@ src = shaders/sel.vert
 type = custom
 cmd = glslc -o $build_dir/shaders/sel.frag.spv shaders/sel.frag
 src = shaders/sel.frag
+
+[$build_dir/shaders/shape.vert.spv]
+type = custom
+cmd = glslc -o $build_dir/shaders/shape.vert.spv shaders/shape.vert
+src = shaders/shape.vert
+
+[$build_dir/shaders/shape.frag.spv]
+type = custom
+cmd = glslc -o $build_dir/shaders/shape.frag.spv shaders/shape.frag
+src = shaders/shape.frag
+
+[$build_dir/shaders/circle.vert.spv]
+type = custom
+cmd = glslc -o $build_dir/shaders/circle.vert.spv shaders/circle.vert
+src = shaders/circle.vert
+
+[$build_dir/shaders/circle.frag.spv]
+type = custom
+cmd = glslc -o $build_dir/shaders/circle.frag.spv shaders/circle.frag
+src = shaders/circle.frag
 
 [bundler]
 src = src/bundler/**.c

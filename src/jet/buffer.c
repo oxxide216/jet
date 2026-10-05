@@ -187,6 +187,9 @@ void buffer_move_right_word(Buffer *buffer) {
 void buffer_move_down_paragraph(Buffer *buffer) {
   bool found_paragraph = false;
 
+  buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
+
   while (buffer->cursor_row + 1 < buffer->lines.len &&
          (!found_paragraph ||
           buffer->lines.items[buffer->cursor_row].len > 0)) {
@@ -201,6 +204,9 @@ void buffer_move_down_paragraph(Buffer *buffer) {
 void buffer_move_up_paragraph(Buffer *buffer) {
   bool found_paragraph = false;
 
+  buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
+
   while (buffer->cursor_row > 0 &&
          (!found_paragraph ||
           buffer->lines.items[buffer->cursor_row - 1].len > 0)) {
@@ -210,6 +216,30 @@ void buffer_move_up_paragraph(Buffer *buffer) {
   }
 
   ensure_safe_cursor_col(buffer);
+}
+
+void buffer_goto_line_begin(Buffer *buffer) {
+  buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
+}
+
+void buffer_goto_line_end(Buffer *buffer) {
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  buffer->cursor_col = line->len;
+  buffer->desired_col = buffer->cursor_col;
+}
+
+void buffer_goto_buffer_begin(Buffer *buffer) {
+  buffer->cursor_row = 0;
+  buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
+}
+
+void buffer_goto_buffer_end(Buffer *buffer) {
+  buffer->cursor_row = buffer->lines.len - 1;
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  buffer->cursor_col = line->len;
+  buffer->desired_col = buffer->cursor_col;
 }
 
 void buffer_delete(Buffer *buffer) {

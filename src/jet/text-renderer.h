@@ -71,7 +71,7 @@ typedef struct {
   u32             sel_end_col;
   u32             line_index;
   bool            is_glyphs_cache_dirty;
-  bool            is_ubo_data_ditry;
+  bool            is_ubo_data_dirty;
 } TextRenderer;
 
 TextRenderer tr_make(VikInstance *instance,
@@ -85,10 +85,10 @@ void         tr_resize(TextRenderer *tr, f32 width, f32 height);
 void         tr_begin_frame(TextRenderer *tr, f32 scale,
                             u32 sel_begin_row, u32 sel_begin_col,
                             u32 sel_end_row, u32 sel_end_col);
-
 void         tr_set_bg_color(TextRenderer *tr, f32 r, f32 g, f32 b);
 void         tr_set_fg_color(TextRenderer *tr, f32 r, f32 g, f32 b);
 void         tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y);
+void         tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y);
 void         tr_end_frame(TextRenderer *tr);
 void         tr_delete(TextRenderer *tr);
 

@@ -67,7 +67,7 @@ TextRenderer tr_make(VikInstance *instance,
 void tr_resize(TextRenderer *tr, f32 width, f32 height) {
   tr->ubo_data.screen_width = width;
   tr->ubo_data.screen_height = height;
-  tr->is_ubo_data_ditry = true;
+  tr->is_ubo_data_dirty = true;
 }
 
 void tr_begin_frame(TextRenderer *tr, f32 scale,
@@ -257,10 +257,29 @@ void tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
   ++tr->line_index;
 }
 
+void tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
+  for (u32 i = 0; i < text_len; ++i) {
+    TextSSBOEntry entry = {
+      x, y,       // Modified by get_char_data
+      10.0, 10.0, // Overwritten by get_char_data
+      0.0, 0.0,   // Overwritten by get_char_data
+      1.0, 1.0,   // Overwritten by get_char_data
+      tr->fg_r, tr->fg_g, tr->fg_b,
+      {},
+    };
+    get_char_data(tr, text[i], tr->scale,
+                  &x, &entry.y,
+                  &entry.w, &entry.h,
+                  &entry.tl_u, &entry.tl_v,
+                  &entry.br_u, &entry.br_v);
+    DA_APPEND(tr->text_ssbo_data, entry);
+  }
+}
+
 void tr_end_frame(TextRenderer *tr) {
-  if (tr->is_ubo_data_ditry) {
+  if (tr->is_ubo_data_dirty) {
     vik_set_buffer_data(tr->ubo, &tr->ubo_data);
-    tr->is_ubo_data_ditry = false;
+    tr->is_ubo_data_dirty = false;
   }
 
   bool should_recreate_text_ssbo = tr->text_ssbo_data.len > tr->max_text_ssbo_data_len;
