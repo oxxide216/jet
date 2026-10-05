@@ -4,7 +4,7 @@
 #include "config.h"
 
 #define ATLAS_PADDING 5
-#define ATLAS_WIDTH   4096
+#define ATLAS_WIDTH   32768
 #define ATLAS_HEIGHT  MAX_FONT_SCALE
 
 typedef struct {
@@ -118,6 +118,8 @@ static void get_char_data(TextRenderer *tr, u32 _char, f32 scale,
     tr->atlas_cursor_x = 0;
 
     memset(tr->atlas_data, 0, ATLAS_WIDTH * ATLAS_HEIGHT * sizeof(*tr->atlas_data));
+
+    tr->glyphs_cache.len = 0;
   }
 
   // If this fails, increase atlas size
@@ -138,8 +140,6 @@ static void get_char_data(TextRenderer *tr, u32 _char, f32 scale,
   *out_tl_v = 0.0;
 
   tr->atlas_cursor_x += width;
-  if (tr->atlas_max_height_in_row < (u32) height)
-    tr->atlas_max_height_in_row = (u32) height;
 
   *out_br_u = (f32) tr->atlas_cursor_x / ATLAS_WIDTH;
   *out_br_v = (f32) height / ATLAS_HEIGHT;

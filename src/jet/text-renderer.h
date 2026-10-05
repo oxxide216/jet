@@ -51,7 +51,6 @@ typedef struct {
   u32             max_sel_ssbo_data_len;
   u8             *atlas_data;
   u32             atlas_cursor_x;
-  u32             atlas_max_height_in_row;
   VikInstance    *instance;
   VikExecutor    *executor;
   VikBuffer      *ubo;
