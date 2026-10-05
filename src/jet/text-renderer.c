@@ -1,10 +1,11 @@
 #include <assert.h>
 
 #include "text-renderer.h"
+#include "config.h"
 
-#define ATLAS_WIDTH   4096
-#define ATLAS_HEIGHT  4096
 #define ATLAS_PADDING 5
+#define ATLAS_WIDTH   4096
+#define ATLAS_HEIGHT  MAX_FONT_SCALE
 
 typedef struct {
   u32 dummy;
@@ -112,45 +113,36 @@ static void get_char_data(TextRenderer *tr, u32 _char, f32 scale,
   u8 *bitmap = stbtt_GetCodepointBitmap(&tr->font, 0.0, scale_y, _char,
                                         &width, &height, NULL, NULL);
 
+  // Resetting in case we zoomed in/out too much
   if (tr->atlas_cursor_x + width + ATLAS_PADDING > ATLAS_WIDTH) {
     tr->atlas_cursor_x = 0;
-    tr->atlas_cursor_y += tr->atlas_max_height_in_row;
-    tr->atlas_max_height_in_row = 0;
-  }
-
-  // Resetting in case we zoomed in/out too much
-  if (tr->atlas_cursor_x + width + ATLAS_PADDING > ATLAS_WIDTH ||
-      tr->atlas_cursor_y + height + ATLAS_PADDING > ATLAS_HEIGHT) {
-    tr->atlas_cursor_x = 0;
-    tr->atlas_cursor_y = 0;
 
     memset(tr->atlas_data, 0, ATLAS_WIDTH * ATLAS_HEIGHT * sizeof(*tr->atlas_data));
   }
 
   // If this fails, increase atlas size
   assert(tr->atlas_cursor_x + width + ATLAS_PADDING <= ATLAS_WIDTH);
-  assert(tr->atlas_cursor_y + height + ATLAS_PADDING <= ATLAS_HEIGHT);
+  assert(height <= ATLAS_HEIGHT);
 
   tr->atlas_cursor_x += ATLAS_PADDING;
-  tr->atlas_cursor_y += ATLAS_PADDING;
 
   for (u32 y = 0; y < (u32) height; ++y)
     for (u32 x = 0; x < (u32) width; ++x)
-      tr->atlas_data[(y + tr->atlas_cursor_y) * ATLAS_WIDTH + x + tr->atlas_cursor_x] =
+      tr->atlas_data[y * ATLAS_WIDTH + x + tr->atlas_cursor_x] =
         bitmap[y * width + x];
 
   *out_width = (f32) width;
   *out_height = (f32) height;
 
   *out_tl_u = (f32) tr->atlas_cursor_x / ATLAS_WIDTH;
-  *out_tl_v = (f32) tr->atlas_cursor_y / ATLAS_HEIGHT;
+  *out_tl_v = 0.0;
 
   tr->atlas_cursor_x += width;
   if (tr->atlas_max_height_in_row < (u32) height)
     tr->atlas_max_height_in_row = (u32) height;
 
   *out_br_u = (f32) tr->atlas_cursor_x / ATLAS_WIDTH;
-  *out_br_v = (f32) (tr->atlas_cursor_y + height) / ATLAS_HEIGHT;
+  *out_br_v = (f32) height / ATLAS_HEIGHT;
 
   free(bitmap);
 
