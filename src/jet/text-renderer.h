@@ -62,6 +62,7 @@ typedef struct {
   VikMesh        *mesh;
   f32             bg_r, bg_g, bg_b;
   f32             fg_r, fg_g, fg_b;
+  f32             acc_r, acc_g, acc_b;
   f32             scale;
   u32             sel_begin_row;
   u32             sel_begin_col;
@@ -85,6 +86,7 @@ void         tr_begin_frame(TextRenderer *tr, f32 scale,
                             u32 sel_end_row, u32 sel_end_col);
 void         tr_set_bg_color(TextRenderer *tr, f32 r, f32 g, f32 b);
 void         tr_set_fg_color(TextRenderer *tr, f32 r, f32 g, f32 b);
+void         tr_set_acc_color(TextRenderer *tr, f32 r, f32 g, f32 b);
 void         tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y);
 void         tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y);
 void         tr_end_frame(TextRenderer *tr);

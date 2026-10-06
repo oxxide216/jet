@@ -86,6 +86,9 @@ i32 main(i32 argc, char **argv) {
 
   tr_set_bg_color(&tr, BG_COLOR);
   tr_set_fg_color(&tr, FG_COLOR);
+  tr_set_acc_color(&tr, ACC_COLOR);
+
+  tr_set_acc_color(&ptr, ACC_COLOR);
 
   while (is_running) {
     WinxEvent event;
@@ -420,11 +423,11 @@ i32 main(i32 argc, char **argv) {
           tr_set_fg_color(&ptr, BG_COLOR);
 
           sr_draw_rect(&sr,
-                       window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
+                       window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
                        y,
-                       window->width * PALETTE_WIDTH_FACTOR,
+                       window->width * PALETTE_WIDTH_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
                        editor.font_scale,
-                       FG_COLOR, PALETTE_ALPHA);
+                       ACC_COLOR, PALETTE_ALPHA);
         } else {
           tr_set_bg_color(&ptr, BG_COLOR);
           tr_set_fg_color(&ptr, FG_COLOR);

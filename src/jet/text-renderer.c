@@ -185,6 +185,12 @@ void tr_set_fg_color(TextRenderer *tr, f32 r, f32 g, f32 b) {
   tr->fg_b = b;
 }
 
+void tr_set_acc_color(TextRenderer *tr, f32 r, f32 g, f32 b) {
+  tr->acc_r = r;
+  tr->acc_g = g;
+  tr->acc_b = b;
+}
+
 void tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
   f32 sel_begin_x = x;
   f32 sel_end_x = x;
@@ -232,7 +238,7 @@ void tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
     SelSSBOEntry entry = {
       sel_begin_x, y,
       sel_end_x - sel_begin_x, tr->scale,
-      tr->fg_r, tr->fg_g, tr->fg_b,
+      tr->acc_r, tr->acc_g, tr->acc_b,
       {},
     };
 
