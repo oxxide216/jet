@@ -165,10 +165,12 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeLeft: {
           if (is_ctrl_pressed) {
             if (is_alt_pressed) {
-              if (editor.current_main_buffer_index > 0)
-                --editor.current_main_buffer_index;
-              else
-                editor.current_main_buffer_index = editor.main_buffers.len - 1;
+              if (editor.mode == JetModeEditor) {
+                if (editor.current_main_buffer_index > 0)
+                  --editor.current_main_buffer_index;
+                else
+                  editor.current_main_buffer_index = editor.main_buffers.len - 1;
+              }
             } else {
               buffer_move_left_word(editor.current_buffer);
             }
@@ -180,10 +182,12 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeRight: {
           if (is_ctrl_pressed) {
             if (is_alt_pressed) {
-              if (editor.current_main_buffer_index + 1 < editor.main_buffers.len)
-                ++editor.current_main_buffer_index;
-              else
-                editor.current_main_buffer_index = 0;
+              if (editor.mode == JetModeEditor) {
+                if (editor.current_main_buffer_index + 1 < editor.main_buffers.len)
+                  ++editor.current_main_buffer_index;
+                else
+                  editor.current_main_buffer_index = 0;
+              }
             } else {
               buffer_move_right_word(editor.current_buffer);
             }
@@ -294,6 +298,19 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeQ: {
           if (is_ctrl_pressed)
             is_running = false;
+        } break;
+
+        case WinxKeyCodeK: {
+          buffer_delete(&CURRENT_BUFFER());
+          if (CURRENT_FILE_PATH())
+            free(CURRENT_FILE_PATH());
+          DA_REMOVE_AT(editor.main_buffers, editor.current_main_buffer_index);
+          if (editor.main_buffers.len == 0) {
+            MainBuffer main_buffer = { buffer_make(), NULL };
+            DA_APPEND(editor.main_buffers, main_buffer);
+          }
+          if (editor.current_main_buffer_index > 0)
+            --editor.current_main_buffer_index;
         } break;
 
         case WinxKeyCodeEscape: {
