@@ -48,7 +48,7 @@ static bool execute(Editor *editor, u32 index) {
     editor->options.len = 0;
     editor->provider = &save_new_file_provider;
     editor->selected_option = 0;
-    buffer_delete_line(editor->current_buffer);
+    buffer_remove_line(editor->current_buffer);
 
     return false;
   }

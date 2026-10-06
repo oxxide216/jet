@@ -1,4 +1,4 @@
-// TODO: scroll
+// TODO: palette scroll
 
 #include "shl/shl-defs.h"
 #include "viking/viking.h"
@@ -19,8 +19,53 @@
 #define CURRENT_BUFFER()                                             \
   editor.main_buffers.items[editor.current_main_buffer_index].buffer
 
+#define CURRENT_SCROLL()                                              \
+  editor.main_buffers.items[editor.current_main_buffer_index].scroll
+
 #define CURRENT_FILE_PATH()                                             \
   editor.main_buffers.items[editor.current_main_buffer_index].file_path
+
+static u32 get_max_visual_line_len(WideStr line, WinxWindow *window, TextRenderer *tr) {
+  f32 editor_width = window->width - BUFFER_PADDING * 2.0;
+  Da(u32) line_da = {
+    malloc(line.len * sizeof(*line.ptr)),
+    line.len,
+    line.len,
+  };
+  memcpy(line_da.items, line.ptr, line.len * sizeof(*line.ptr));
+  while (tr_measure_text(tr, line_da.items, line_da.len) < editor_width)
+    DA_APPEND(line_da, U' ');
+  while (line_da.len > 0 &&
+         tr_measure_text(tr, line_da.items, line_da.len) > editor_width)
+    --line_da.len;
+  free(line_da.items);
+  return line_da.len;
+}
+
+static void get_buffer_selection_bounds(Buffer *buffer,
+                                        u32 *min_row, u32 *min_col,
+                                        u32 *max_row, u32 *max_col) {
+  if (buffer->is_selecting) {
+    if (buffer->cursor_row > buffer->anchor_row ||
+        (buffer->cursor_row == buffer->anchor_row &&
+         buffer->cursor_col >= buffer->anchor_col)) {
+      *min_row = buffer->anchor_row;
+      *min_col = buffer->anchor_col;
+      *max_row = buffer->cursor_row;
+      *max_col = buffer->cursor_col;
+    } else {
+      *min_row = buffer->cursor_row;
+      *min_col = buffer->cursor_col;
+      *max_row = buffer->anchor_row;
+      *max_col = buffer->anchor_col;
+    }
+  } else {
+    *min_row = buffer->cursor_row;
+    *min_col = buffer->cursor_col;
+    *max_row = buffer->cursor_row;
+    *max_col = buffer->cursor_col + 1;
+  }
+}
 
 i32 main(i32 argc, char **argv) {
   Winx *winx = winx_init();
@@ -58,7 +103,7 @@ i32 main(i32 argc, char **argv) {
 
   Editor editor = {0};
 
-  MainBuffer main_buffer = { buffer_make(), NULL };
+  MainBuffer main_buffer = main_buffer_make(NULL);
   DA_APPEND(editor.main_buffers, main_buffer);
   editor.palette_buffer = buffer_make();
   editor.current_buffer = &editor.main_buffers.items[0].buffer;
@@ -72,7 +117,7 @@ i32 main(i32 argc, char **argv) {
     editor.main_buffers.items[0].file_path = strdup(argv[1]);
 
     for (u32 i = 2; i < (u32) argc; ++i) {
-      MainBuffer main_buffer = { buffer_make(), NULL };
+      MainBuffer main_buffer = main_buffer_make(NULL);
       buffer_read_file(&main_buffer.buffer, argv[i]);
       main_buffer.file_path = strdup(argv[i]);
       DA_APPEND(editor.main_buffers, main_buffer);
@@ -86,9 +131,9 @@ i32 main(i32 argc, char **argv) {
 
   tr_set_bg_color(&tr, BG_COLOR);
   tr_set_fg_color(&tr, FG_COLOR);
-  tr_set_acc_color(&tr, ACC_COLOR);
+  tr_set_sel_color(&tr, ACC_COLOR);
 
-  tr_set_acc_color(&ptr, ACC_COLOR);
+  tr_set_sel_color(&ptr, ACC_COLOR);
 
   while (is_running) {
     WinxEvent event;
@@ -141,7 +186,7 @@ i32 main(i32 argc, char **argv) {
                 buffer_insert(editor.current_buffer, ' ');
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
-                buffer_delete_line(editor.current_buffer);
+                buffer_remove_line(editor.current_buffer);
                 WideStr *option = editor.options.items + editor.selected_option;
                 for (u32 i = 0; i < option->len; ++i)
                   buffer_insert(editor.current_buffer, option->ptr[i]);
@@ -175,10 +220,10 @@ i32 main(i32 argc, char **argv) {
                   editor.current_main_buffer_index = editor.main_buffers.len - 1;
               }
             } else {
-              buffer_move_left_word(editor.current_buffer);
+              buffer_move_left_word(editor.current_buffer, is_shift_pressed);
             }
           } else {
-            buffer_move_left(editor.current_buffer);
+            buffer_move_left(editor.current_buffer, is_shift_pressed);
           }
         } break;
 
@@ -192,19 +237,24 @@ i32 main(i32 argc, char **argv) {
                   editor.current_main_buffer_index = 0;
               }
             } else {
-              buffer_move_right_word(editor.current_buffer);
+              buffer_move_right_word(editor.current_buffer, is_shift_pressed);
             }
           } else {
-            buffer_move_right(editor.current_buffer);
+            buffer_move_right(editor.current_buffer, is_shift_pressed);
           }
         } break;
 
         case WinxKeyCodeDown: {
           if (editor.mode == JetModeEditor) {
-            if (is_ctrl_pressed)
-              buffer_move_down_paragraph(editor.current_buffer);
-            else
-              buffer_move_down(editor.current_buffer);
+            if (is_ctrl_pressed) {
+              buffer_move_down_paragraph(editor.current_buffer, is_shift_pressed);
+            } else {
+              WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
+              u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
+              buffer_move_down(editor.current_buffer,
+                               is_shift_pressed,
+                               max_visual_line_len);
+            }
           } else if (editor.mode == JetModeCommandPalette) {
             if (editor.selected_option + 1 < editor.options.len)
               ++editor.selected_option;
@@ -215,10 +265,15 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeUp: {
           if (editor.mode == JetModeEditor) {
-            if (is_ctrl_pressed)
-              buffer_move_up_paragraph(editor.current_buffer);
-            else
-              buffer_move_up(editor.current_buffer);
+            if (is_ctrl_pressed) {
+              buffer_move_up_paragraph(editor.current_buffer, is_shift_pressed);
+            } else {
+              WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
+              u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
+              buffer_move_up(editor.current_buffer,
+                             is_shift_pressed,
+                             max_visual_line_len);
+            }
           } else if (editor.mode == JetModeCommandPalette) {
             if (editor.selected_option > 0)
               --editor.selected_option;
@@ -244,7 +299,7 @@ i32 main(i32 argc, char **argv) {
               editor.provider = &command_provider;
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
-              buffer_delete_line(editor.current_buffer);
+              buffer_remove_line(editor.current_buffer);
             } else if (editor.mode == JetModeCommandPalette) {
               editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
               editor.mode = JetModeEditor;
@@ -254,16 +309,16 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeA: {
           if (is_ctrl_pressed)
-            buffer_goto_line_begin(editor.current_buffer);
+            buffer_goto_line_begin(editor.current_buffer, is_shift_pressed);
           else if (is_alt_pressed)
-            buffer_goto_buffer_begin(editor.current_buffer);
+            buffer_goto_buffer_begin(editor.current_buffer, is_shift_pressed);
         } break;
 
         case WinxKeyCodeE: {
           if (is_ctrl_pressed)
-            buffer_goto_line_end(editor.current_buffer);
+            buffer_goto_line_end(editor.current_buffer, is_shift_pressed);
           else if (is_alt_pressed)
-            buffer_goto_buffer_end(editor.current_buffer);
+            buffer_goto_buffer_end(editor.current_buffer, is_shift_pressed);
         } break;
 
         case WinxKeyCodeO: {
@@ -272,7 +327,7 @@ i32 main(i32 argc, char **argv) {
             editor.provider = &open_file_provider;
             editor.selected_option = 0;
             editor.mode = JetModeCommandPalette;
-            buffer_delete_line(editor.current_buffer);
+            buffer_remove_line(editor.current_buffer);
           }
         } break;
 
@@ -283,7 +338,7 @@ i32 main(i32 argc, char **argv) {
               editor.provider = &save_file_provider;
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
-              buffer_delete_line(editor.current_buffer);
+              buffer_remove_line(editor.current_buffer);
             } else {
               buffer_write_file(editor.current_buffer, CURRENT_FILE_PATH());
             }
@@ -293,7 +348,7 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeN: {
           if (is_ctrl_pressed && editor.mode == JetModeEditor) {
             editor.current_main_buffer_index = editor.main_buffers.len;
-            MainBuffer main_buffer = { buffer_make(), NULL };
+            MainBuffer main_buffer = main_buffer_make(NULL);
             DA_APPEND(editor.main_buffers, main_buffer);
           }
         } break;
@@ -309,7 +364,7 @@ i32 main(i32 argc, char **argv) {
             free(CURRENT_FILE_PATH());
           DA_REMOVE_AT(editor.main_buffers, editor.current_main_buffer_index);
           if (editor.main_buffers.len == 0) {
-            MainBuffer main_buffer = { buffer_make(), NULL };
+            MainBuffer main_buffer = main_buffer_make(NULL);
             DA_APPEND(editor.main_buffers, main_buffer);
           }
           if (editor.current_main_buffer_index > 0)
@@ -345,27 +400,51 @@ i32 main(i32 argc, char **argv) {
       }
     }
 
+    // Scroll
+    {
+      if (CURRENT_SCROLL() > (float) CURRENT_BUFFER().anchor_row * editor.font_scale)
+        CURRENT_SCROLL() = (float) CURRENT_BUFFER().anchor_row * editor.font_scale;
+      else if (CURRENT_SCROLL() + (window->height - BUFFER_PADDING * 2.0) <
+               (float) (CURRENT_BUFFER().cursor_row + 1) * editor.font_scale)
+        CURRENT_SCROLL() =
+          (float) (CURRENT_BUFFER().cursor_row + 1) * editor.font_scale -
+          (window->height - BUFFER_PADDING * 2.0);
+    }
+
     if (!vik_begin_frame(executor, BG_COLOR, 1.0)) {
       winx_draw(window);
       continue;
     }
-    tr_begin_frame(&ptr, editor.font_scale,
-                   editor.palette_buffer.cursor_row,
-                   editor.palette_buffer.cursor_col,
-                   editor.palette_buffer.cursor_row,
-                   editor.palette_buffer.cursor_col + 1);
+    {
+      u32 min_row, min_col, max_row, max_col;
+      get_buffer_selection_bounds(&editor.palette_buffer,
+                                  &min_row, &min_col,
+                                  &max_row, &max_col);
+      tr_begin_frame(&ptr, editor.font_scale,
+                     min_row, min_col,
+                     max_row, max_col,
+                     0.0);
+    }
     sr_begin_frame(&sr);
-    tr_begin_frame(&tr, editor.font_scale,
-                   CURRENT_BUFFER().cursor_row,
-                   CURRENT_BUFFER().cursor_col,
-                   CURRENT_BUFFER().cursor_row,
-                   CURRENT_BUFFER().cursor_col + 1);
+    {
+      u32 min_row, min_col, max_row, max_col;
+      get_buffer_selection_bounds(&CURRENT_BUFFER(),
+                                  &min_row, &min_col,
+                                  &max_row, &max_col);
+      tr_begin_frame(&tr, editor.font_scale,
+                     min_row, min_col,
+                     max_row, max_col,
+                     CURRENT_SCROLL());
+    }
+
+    f32 y = BUFFER_PADDING;
     for (u32 i = 0; i < CURRENT_BUFFER().lines.len; ++i) {
       Line *line = CURRENT_BUFFER().lines.items + i;
-      tr_draw_line(&tr, line->items, line->len,
-                   BUFFER_PADDING,
-                   BUFFER_PADDING + editor.font_scale * i);
+      y = tr_draw_line(&tr, line->items, line->len,
+                       BUFFER_PADDING, y,
+                       window->width - BUFFER_PADDING * 2.0);
     }
+
     if (editor.mode == JetModeCommandPalette) {
       WideStr line = buffer_get_current_line(editor.current_buffer);
 
@@ -396,6 +475,7 @@ i32 main(i32 argc, char **argv) {
                            window->height * PALETTE_HEIGHT_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
                            PALETTE_BORDER_RADIUS - PALETTE_BORDER_WIDTH, BG_COLOR, PALETTE_ALPHA,
                            false);
+      // Separator
       sr_draw_rect(&sr,
                    window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
                    window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 2.0 + PALETTE_BORDER_WIDTH + editor.font_scale,
@@ -404,7 +484,8 @@ i32 main(i32 argc, char **argv) {
                    FG_COLOR, PALETTE_ALPHA);
       tr_draw_line(&ptr, line.ptr, line.len,
                    window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH,
-                   window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH);
+                   window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH,
+                   INFINITY);
 
       editor.provider->free_opts(editor.options);
       editor.options = editor.provider->get_opts(line);
@@ -436,6 +517,7 @@ i32 main(i32 argc, char **argv) {
         tr_draw_text(&ptr, option->ptr, option->len, x, y);
       }
     }
+
     tr_end_frame(&tr);
     sr_end_frame(&sr);
     tr_end_frame(&ptr);

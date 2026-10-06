@@ -6,6 +6,7 @@
 
 typedef struct {
   Buffer  buffer;
+  f32     scroll;
   char   *file_path;
 } MainBuffer;
 
@@ -30,5 +31,7 @@ struct Editor {
 
   f32 font_scale;
 };
+
+MainBuffer main_buffer_make(char *path);
 
 #endif // EDITOR_H

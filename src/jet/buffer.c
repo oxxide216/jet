@@ -3,6 +3,7 @@
 
 #include "buffer.h"
 #include "common.h"
+#include "config.h"
 
 Buffer buffer_make(void) {
   Buffer buffer = {0};
@@ -16,19 +17,97 @@ void buffer_reset(Buffer *buffer) {
       free(buffer->lines.items[i].items);
   buffer->lines.len = 1;
   buffer->lines.items[0].len = 0;
+  buffer->anchor_row = 0;
+  buffer->anchor_col = 0;
   buffer->cursor_row = 0;
   buffer->cursor_col = 0;
   buffer->desired_col = buffer->cursor_col;
 }
 
+static void get_buffer_selection_bounds(Buffer *buffer,
+                                        u32 *min_row, u32 *min_col,
+                                        u32 *max_row, u32 *max_col) {
+  if (buffer->cursor_row > buffer->anchor_row ||
+      (buffer->cursor_row == buffer->anchor_row &&
+       buffer->cursor_col >= buffer->anchor_col)) {
+    *min_row = buffer->anchor_row;
+    *min_col = buffer->anchor_col;
+    *max_row = buffer->cursor_row;
+    *max_col = buffer->cursor_col;
+  } else {
+    *min_row = buffer->cursor_row;
+    *min_col = buffer->cursor_col;
+    *max_row = buffer->anchor_row;
+    *max_col = buffer->anchor_col;
+  }
+}
+
+static void merge_line_down(Buffer *buffer, u32 index) {
+  Line *line0 = buffer->lines.items + index;
+  Line *line1 = buffer->lines.items + index + 1;
+
+  if (line0->cap < line0->len + line1->len) {
+    line0->cap = line0->len + line1->len;
+    line0->items = realloc(line0->items, line0->cap * sizeof(*line0->items));
+  }
+
+  memcpy(line0->items + line0->len, line1->items, line1->len * sizeof(*line1->items));
+  line0->len += line1->len;
+
+  if (line1->items)
+    free(line1->items);
+  DA_REMOVE_AT(buffer->lines, index + 1);
+}
+
+static void buffer_remove_selection(Buffer *buffer) {
+  u32 min_row, min_col, max_row, max_col;
+  get_buffer_selection_bounds(buffer,
+                              &min_row, &min_col,
+                              &max_row, &max_col);
+
+  if (min_row == max_row) {
+    Line *line = buffer->lines.items + min_row;
+    memmove(line->items + min_col,
+            line->items + max_col,
+            (line->len - max_col) * sizeof(*line->items));
+    line->len -= max_col - min_col;
+  } else {
+    for (u32 i = min_row + 1; i < max_row; ++i) {
+      if (buffer->lines.items[min_row + 1].items)
+        free(buffer->lines.items[min_row + 1].items);
+      DA_REMOVE_AT(buffer->lines, min_row + 1);
+    }
+
+    Line *line0 = buffer->lines.items + min_row;
+    Line *line1 = buffer->lines.items + min_row + 1;
+    line0->len = min_col;
+    memmove(line1->items,
+            line1->items + max_col,
+            (line1->len - max_col) * sizeof(*line1->items));
+    line1->len -= max_col;
+    merge_line_down(buffer, min_row);
+  }
+  buffer->cursor_row = min_row;
+  buffer->cursor_col = min_col;
+  buffer->is_selecting = false;
+}
+
 void buffer_insert(Buffer *buffer, u32 _char) {
+  if (buffer->is_selecting)
+    buffer_remove_selection(buffer);
+
   Line *line = buffer->lines.items + buffer->cursor_row;
   DA_INSERT(*line, buffer->cursor_col, _char);
   ++buffer->cursor_col;
   buffer->desired_col = buffer->cursor_col;
+
+  buffer->anchor_col = buffer->cursor_col;
 }
 
 void buffer_insert_new_line(Buffer *buffer) {
+  if (buffer->is_selecting)
+    buffer_remove_selection(buffer);
+
   Line *line = buffer->lines.items + buffer->cursor_row;
   Line new_line = {0};
   new_line.len = line->len - buffer->cursor_col;
@@ -42,26 +121,17 @@ void buffer_insert_new_line(Buffer *buffer) {
   buffer->cursor_col = 0;
   buffer->desired_col = buffer->cursor_col;
   DA_INSERT(buffer->lines, buffer->cursor_row, new_line);
-}
 
-static void merge_line_down(Buffer *buffer, u32 index) {
-  Line *line0 = buffer->lines.items + index;
-  Line *line1 = buffer->lines.items + index + 1;
-
-  if (line0->cap < line0->len + line1->len) {
-    line0->cap = line0->len + line1->len;
-    line0->items = realloc(line0->items, line0->cap * sizeof(u32));
-  }
-
-  memcpy(line0->items + line0->len, line1->items, line1->len * sizeof(u32));
-  line0->len += line1->len;
-
-  if (line1->items)
-    free(line1->items);
-  DA_REMOVE_AT(buffer->lines, index + 1);
+  buffer->anchor_col = buffer->cursor_col;
+  buffer->anchor_row = buffer->cursor_row;
 }
 
 void buffer_remove_before_cursor(Buffer *buffer) {
+  if (buffer->is_selecting) {
+    buffer_remove_selection(buffer);
+    return;
+  }
+
   if (buffer->cursor_col > 0) {
     Line *line = buffer->lines.items + buffer->cursor_row;
     --buffer->cursor_col;
@@ -77,6 +147,11 @@ void buffer_remove_before_cursor(Buffer *buffer) {
 }
 
 void buffer_remove_at_cursor(Buffer *buffer) {
+  if (buffer->is_selecting) {
+    buffer_remove_selection(buffer);
+    return;
+  }
+
   Line *line = buffer->lines.items + buffer->cursor_row;
   if (buffer->cursor_col < line->len)
     DA_REMOVE_AT(*line, buffer->cursor_col);
@@ -84,7 +159,17 @@ void buffer_remove_at_cursor(Buffer *buffer) {
     merge_line_down(buffer, buffer->cursor_row);
 }
 
-void buffer_move_left(Buffer *buffer) {
+void buffer_move_left(Buffer *buffer, bool is_selecting) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  } else if (buffer->is_selecting && !is_selecting) {
+    buffer->is_selecting = is_selecting;
+    return;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   if (buffer->cursor_col > 0) {
     --buffer->cursor_col;
   } else if (buffer->cursor_row > 0) {
@@ -95,7 +180,17 @@ void buffer_move_left(Buffer *buffer) {
   buffer->desired_col = buffer->cursor_col;
 }
 
-void buffer_move_right(Buffer *buffer) {
+void buffer_move_right(Buffer *buffer, bool is_selecting) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  } else if (buffer->is_selecting && !is_selecting) {
+    buffer->is_selecting = is_selecting;
+    return;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   Line *line = buffer->lines.items + buffer->cursor_row;
   if (buffer->cursor_col < line->len) {
     ++buffer->cursor_col;
@@ -103,32 +198,91 @@ void buffer_move_right(Buffer *buffer) {
     ++buffer->cursor_row;
     buffer->cursor_col = 0;
   }
-  buffer->desired_col = buffer->cursor_col;
 }
 
-static void ensure_safe_cursor_col(Buffer *buffer) {
+// This is magic
+void buffer_move_down(Buffer *buffer, bool is_selecting, u32 max_visual_line_len) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   Line *line = buffer->lines.items + buffer->cursor_row;
-  if (buffer->desired_col > line->len)
-    buffer->cursor_col = line->len;
-  else
-    buffer->cursor_col = buffer->desired_col;
-}
-
-void buffer_move_down(Buffer *buffer) {
-  if (buffer->cursor_row + 1 < buffer->lines.len) {
+  if (buffer->cursor_col + max_visual_line_len <= line->len + 1) {
+    u32 rem = buffer->cursor_col % max_visual_line_len;
+    if (rem < ARRAY_LEN(LINE_WRAP_MARKER))
+      buffer->cursor_col += max_visual_line_len - rem - 1;
+    else
+      buffer->cursor_col += max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
+    buffer->desired_col = buffer->cursor_col;
+  } else if (buffer->cursor_col + max_visual_line_len <=
+             line->len + ARRAY_LEN(LINE_WRAP_MARKER)) {
+    buffer->cursor_col += max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
+    buffer->desired_col = buffer->cursor_col;
+  } else if (buffer->cursor_row + 1 < buffer->lines.len) {
     ++buffer->cursor_row;
-    ensure_safe_cursor_col(buffer);
+
+    buffer->cursor_col = buffer->desired_col;
+    if (buffer->cursor_col + 1 >= max_visual_line_len) {
+      bool flag = buffer->cursor_col + 1 == max_visual_line_len;
+      if (flag)
+        ++buffer->cursor_col;
+      buffer->cursor_col %= max_visual_line_len;
+      buffer->cursor_col += ARRAY_LEN(LINE_WRAP_MARKER) - flag;
+      buffer->desired_col = buffer->cursor_col;
+    }
+
+    Line *line = buffer->lines.items + buffer->cursor_row;
+    if (buffer->cursor_col > line->len)
+      buffer->cursor_col = line->len;
   }
 }
 
-void buffer_move_up(Buffer *buffer) {
-  if (buffer->cursor_row > 0) {
+// This is magic too
+void buffer_move_up(Buffer *buffer, bool is_selecting, u32 max_visual_line_len) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  }
+
+  buffer->is_selecting = is_selecting;
+
+  if (buffer->cursor_col > max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER)) {
+    buffer->cursor_col -= max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
+    buffer->desired_col = buffer->cursor_col;
+  } else if (buffer->cursor_row > 0) {
     --buffer->cursor_row;
-    ensure_safe_cursor_col(buffer);
+
+    Line *line = buffer->lines.items + buffer->cursor_row;
+    u32 new_col;
+    if (buffer->desired_col > line->len)
+      new_col = line->len;
+    else
+      new_col = buffer->desired_col;
+
+    buffer->cursor_col =
+      line->len -
+      line->len % max_visual_line_len +
+      new_col;
+    if (buffer->cursor_col >= max_visual_line_len) {
+      u32 rem = buffer->cursor_col % max_visual_line_len;
+      if (rem + 1 < ARRAY_LEN(LINE_WRAP_MARKER))
+        buffer->cursor_col -= rem + 1;
+      else
+        buffer->cursor_col -= ARRAY_LEN(LINE_WRAP_MARKER);
+      buffer->desired_col = buffer->cursor_col;
+    }
   }
 }
 
 void buffer_remove_word_before_cursor(Buffer *buffer) {
+  if (buffer->is_selecting) {
+    buffer_remove_selection(buffer);
+    return;
+  }
+
   bool found_word = false;
 
   if (buffer->cursor_col == 0)
@@ -147,6 +301,11 @@ void buffer_remove_word_before_cursor(Buffer *buffer) {
 }
 
 void buffer_remove_word_at_cursor(Buffer *buffer) {
+  if (buffer->is_selecting) {
+    buffer_remove_selection(buffer);
+    return;
+  }
+
   Line *line = buffer->lines.items + buffer->cursor_row;
   bool found_word = false;
 
@@ -162,11 +321,18 @@ void buffer_remove_word_at_cursor(Buffer *buffer) {
   }
 }
 
-void buffer_move_left_word(Buffer *buffer) {
+void buffer_move_left_word(Buffer *buffer, bool is_selecting) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   bool found_word = false;
 
   if (buffer->cursor_col == 0)
-    buffer_move_left(buffer);
+    buffer_move_left(buffer, is_selecting);
 
   Line *line = buffer->lines.items + buffer->cursor_row;
   while (buffer->cursor_col > 0 &&
@@ -179,12 +345,19 @@ void buffer_move_left_word(Buffer *buffer) {
   }
 }
 
-void buffer_move_right_word(Buffer *buffer) {
+void buffer_move_right_word(Buffer *buffer, bool is_selecting) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   Line *line = buffer->lines.items + buffer->cursor_row;
   bool found_word = false;
 
   if (buffer->cursor_col == line->len)
-    buffer_move_right(buffer);
+    buffer_move_right(buffer, is_selecting);
 
   line = buffer->lines.items + buffer->cursor_row;
   while (buffer->cursor_col < line->len &&
@@ -197,7 +370,14 @@ void buffer_move_right_word(Buffer *buffer) {
   }
 }
 
-void buffer_move_down_paragraph(Buffer *buffer) {
+void buffer_move_down_paragraph(Buffer *buffer, bool is_selecting) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   bool found_paragraph = false;
 
   buffer->cursor_col = 0;
@@ -210,15 +390,19 @@ void buffer_move_down_paragraph(Buffer *buffer) {
       found_paragraph = true;
     ++buffer->cursor_row;
   }
-
-  ensure_safe_cursor_col(buffer);
 }
 
-void buffer_move_up_paragraph(Buffer *buffer) {
+void buffer_move_up_paragraph(Buffer *buffer, bool is_selecting) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   bool found_paragraph = false;
 
   buffer->cursor_col = 0;
-  buffer->desired_col = buffer->cursor_col;
 
   while (buffer->cursor_row > 0 &&
          (!found_paragraph ||
@@ -227,32 +411,64 @@ void buffer_move_up_paragraph(Buffer *buffer) {
       found_paragraph = true;
     --buffer->cursor_row;
   }
-
-  ensure_safe_cursor_col(buffer);
 }
 
-void buffer_goto_line_begin(Buffer *buffer) {
+void buffer_goto_line_begin(Buffer *buffer, bool is_selecting) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   buffer->cursor_col = 0;
-  buffer->desired_col = buffer->cursor_col;
 }
 
-void buffer_goto_line_end(Buffer *buffer) {
+void buffer_goto_line_end(Buffer *buffer, bool is_selecting) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   Line *line = buffer->lines.items + buffer->cursor_row;
   buffer->cursor_col = line->len;
   buffer->desired_col = buffer->cursor_col;
 }
 
-void buffer_goto_buffer_begin(Buffer *buffer) {
+void buffer_goto_buffer_begin(Buffer *buffer, bool is_selecting) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   buffer->cursor_row = 0;
   buffer->cursor_col = 0;
-  buffer->desired_col = buffer->cursor_col;
 }
 
-void buffer_goto_buffer_end(Buffer *buffer) {
+void buffer_goto_buffer_end(Buffer *buffer, bool is_selecting) {
+  if (!buffer->is_selecting && is_selecting) {
+    buffer->anchor_row = buffer->cursor_row;
+    buffer->anchor_col = buffer->cursor_col;
+  }
+
+  buffer->is_selecting = is_selecting;
+
   buffer->cursor_row = buffer->lines.len - 1;
   Line *line = buffer->lines.items + buffer->cursor_row;
   buffer->cursor_col = line->len;
   buffer->desired_col = buffer->cursor_col;
+}
+
+void buffer_remove_line(Buffer *buffer) {
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  line->len = 0;
+  buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
+  buffer->is_selecting = false;
 }
 
 void buffer_delete(Buffer *buffer) {
@@ -263,13 +479,6 @@ void buffer_delete(Buffer *buffer) {
   }
   if (buffer->lines.items)
     free(buffer->lines.items);
-}
-
-void buffer_delete_line(Buffer *buffer) {
-  Line *line = buffer->lines.items + buffer->cursor_row;
-  line->len = 0;
-  buffer->cursor_col = 0;
-  buffer->desired_col = buffer->cursor_col;
 }
 
 void buffer_read_file(Buffer *buffer, char *path) {
@@ -287,6 +496,8 @@ void buffer_read_file(Buffer *buffer, char *path) {
 
   fclose(file);
 
+  buffer->anchor_row = 0;
+  buffer->anchor_col = 0;
   buffer->cursor_row = 0;
   buffer->cursor_col = 0;
   buffer->desired_col = buffer->cursor_col;
@@ -308,8 +519,30 @@ void buffer_write_file(Buffer *buffer, char *path) {
   fclose(file);
 }
 
+WideStr buffer_get_prev_line(Buffer *buffer) {
+  if (buffer->cursor_row == 0)
+    return (WideStr) {0};
+
+  Line *line = buffer->lines.items + buffer->cursor_row - 1;
+  return (WideStr) {
+    line->items,
+    line->len,
+  };
+}
+
 WideStr buffer_get_current_line(Buffer *buffer) {
   Line *line = buffer->lines.items + buffer->cursor_row;
+  return (WideStr) {
+    line->items,
+    line->len,
+  };
+}
+
+WideStr buffer_get_next_line(Buffer *buffer) {
+  if (buffer->cursor_row == buffer->lines.len)
+    return (WideStr) {0};
+
+  Line *line = buffer->lines.items + buffer->cursor_row + 1;
   return (WideStr) {
     line->items,
     line->len,

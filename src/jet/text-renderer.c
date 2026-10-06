@@ -73,7 +73,8 @@ void tr_resize(TextRenderer *tr, f32 width, f32 height) {
 
 void tr_begin_frame(TextRenderer *tr, f32 scale,
                     u32 sel_begin_row, u32 sel_begin_col,
-                    u32 sel_end_row, u32 sel_end_col) {
+                    u32 sel_end_row, u32 sel_end_col,
+                    f32 scroll) {
   tr->text_ssbo_data.len = 0;
   tr->sel_ssbo_data.len = 0;
   tr->is_glyphs_cache_dirty = false;
@@ -84,6 +85,7 @@ void tr_begin_frame(TextRenderer *tr, f32 scale,
   tr->sel_begin_col = sel_begin_col;
   tr->sel_end_row = sel_end_row;
   tr->sel_end_col = sel_end_col;
+  tr->scroll = scroll;
 
   tr->line_index = 0;
 }
@@ -96,24 +98,32 @@ static void get_char_data(TextRenderer *tr, u32 _char, f32 scale,
   for (u32 i = 0; i < tr->glyphs_cache.len; ++i) {
     Glyph *glyph = tr->glyphs_cache.items + i;
     if (glyph->_char == _char && glyph->scale == scale) {
-      *out_x += glyph->x_offset;
-      *out_y += glyph->y_offset;
-      *out_width = glyph->w;
-      *out_height = glyph->h;
-      *out_tl_u = glyph->tl_u;
-      *out_tl_v = glyph->tl_v;
-      *out_br_u = glyph->br_u;
-      *out_br_v = glyph->br_v;
+      if (out_x)
+        *out_x += glyph->x_offset;
+      if (out_y)
+        *out_y += glyph->y_offset;
+      if (out_width)
+        *out_width = glyph->w;
+      if (out_height)
+        *out_height = glyph->h;
+      if (out_tl_u)
+        *out_tl_u = glyph->tl_u;
+      if (out_tl_v)
+        *out_tl_v = glyph->tl_v;
+      if (out_br_u)
+        *out_br_u = glyph->br_u;
+      if (out_br_v)
+        *out_br_v = glyph->br_v;
       return;
     }
   }
 
   f32 scale_y = stbtt_ScaleForPixelHeight(&tr->font, scale);
-  i32 width, height;
+  i32 width = 0, height = 0;
   u8 *bitmap = stbtt_GetCodepointBitmap(&tr->font, 0.0, scale_y, _char,
                                         &width, &height, NULL, NULL);
 
-  // Resetting in case we zoomed in/out too much
+  // Resetting in case we zoomed in/out too many times
   if (tr->atlas_cursor_x + width + ATLAS_PADDING > ATLAS_WIDTH) {
     tr->atlas_cursor_x = 0;
 
@@ -133,16 +143,16 @@ static void get_char_data(TextRenderer *tr, u32 _char, f32 scale,
       tr->atlas_data[y * ATLAS_WIDTH + x + tr->atlas_cursor_x] =
         bitmap[y * width + x];
 
-  *out_width = (f32) width;
-  *out_height = (f32) height;
+  f32 o_width = (f32) width;
+  f32 o_height = (f32) height;
 
-  *out_tl_u = (f32) tr->atlas_cursor_x / ATLAS_WIDTH;
-  *out_tl_v = 0.0;
+  f32 o_tl_u = (f32) tr->atlas_cursor_x / ATLAS_WIDTH;
+  f32 o_tl_v = 0.0;
 
   tr->atlas_cursor_x += width;
 
-  *out_br_u = (f32) tr->atlas_cursor_x / ATLAS_WIDTH;
-  *out_br_v = (f32) height / ATLAS_HEIGHT;
+  f32 o_br_u = (f32) tr->atlas_cursor_x / ATLAS_WIDTH;
+  f32 o_br_v = (f32) height / ATLAS_HEIGHT;
 
   free(bitmap);
 
@@ -158,19 +168,33 @@ static void get_char_data(TextRenderer *tr, u32 _char, f32 scale,
   f32 x_offset = advance * scale_y;
   f32 y_offset = ascent * scale_y + y0;
 
-  *out_x += x_offset;
-  *out_y += y_offset;
-
   Glyph glyph = {
     _char,
     scale,
     x_offset, y_offset,
-    *out_width, *out_height,
-    *out_tl_u, *out_tl_v,
-    *out_br_u, *out_br_v,
+    o_width, o_height,
+    o_tl_u, o_tl_v,
+    o_br_u, o_br_v,
   };
   DA_APPEND(tr->glyphs_cache, glyph);
   tr->is_glyphs_cache_dirty = true;
+
+  if (out_x)
+    *out_x += x_offset;
+  if (out_y)
+    *out_y += y_offset;
+  if (out_width)
+    *out_width = o_width;
+  if (out_height)
+    *out_height = o_height;
+  if (out_tl_u)
+    *out_tl_u = o_tl_u;
+  if (out_tl_v)
+    *out_tl_v = o_tl_v;
+  if (out_br_u)
+    *out_br_u = o_br_u;
+  if (out_br_v)
+    *out_br_v = o_br_v;
 }
 
 void tr_set_bg_color(TextRenderer *tr, f32 r, f32 g, f32 b) {
@@ -185,15 +209,31 @@ void tr_set_fg_color(TextRenderer *tr, f32 r, f32 g, f32 b) {
   tr->fg_b = b;
 }
 
-void tr_set_acc_color(TextRenderer *tr, f32 r, f32 g, f32 b) {
-  tr->acc_r = r;
-  tr->acc_g = g;
-  tr->acc_b = b;
+void tr_set_sel_color(TextRenderer *tr, f32 r, f32 g, f32 b) {
+  tr->sel_r = r;
+  tr->sel_g = g;
+  tr->sel_b = b;
 }
 
-void tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
+f32 tr_measure_text(TextRenderer *tr, u32 *text, u32 text_len) {
+  f32 width = 0.0;
+
+  for (u32 i = 0; i < text_len; ++i)
+    get_char_data(tr, text[i], tr->scale,
+                  &width, NULL, NULL, NULL,
+                  NULL, NULL, NULL, NULL);
+
+  return width;
+}
+
+f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y, f32 x_limit) {
+  f32 begin_x = x;
+  y -= tr->scroll;
+
   f32 sel_begin_x = x;
   f32 sel_end_x = x;
+
+  u32 last_wrap_i = 0;
 
   for (u32 i = 0; i < text_len; ++i) {
     bool is_selected =
@@ -212,7 +252,7 @@ void tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
     f32 r = is_selected ? tr->bg_r : tr->fg_r;
     f32 g = is_selected ? tr->bg_g : tr->fg_g;
     f32 b = is_selected ? tr->bg_b : tr->fg_b;
-    TextSSBOEntry entry = {
+    TextSSBOEntry text_entry = {
       x, y,       // Modified by get_char_data
       10.0, 10.0, // Overwritten by get_char_data
       0.0, 0.0,   // Overwritten by get_char_data
@@ -221,41 +261,87 @@ void tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
       {},
     };
     get_char_data(tr, text[i], tr->scale,
-                  &x, &entry.y,
-                  &entry.w, &entry.h,
-                  &entry.tl_u, &entry.tl_v,
-                  &entry.br_u, &entry.br_v);
-    DA_APPEND(tr->text_ssbo_data, entry);
+                  &x, &text_entry.y,
+                  &text_entry.w, &text_entry.h,
+                  &text_entry.tl_u, &text_entry.tl_v,
+                  &text_entry.br_u, &text_entry.br_v);
+
+    if (x > x_limit) {
+      if (tr->line_index > tr->sel_begin_row ||
+          (tr->line_index == tr->sel_begin_row &&
+           i > tr->sel_begin_col)) {
+        SelSSBOEntry sel_entry = {
+          sel_begin_x, y,
+          sel_end_x - sel_begin_x, tr->scale,
+          tr->sel_r, tr->sel_g, tr->sel_b,
+          {},
+        };
+
+        if (sel_entry.w == 0.0) {
+          f32 scale_y = stbtt_ScaleForPixelHeight(&tr->font, tr->scale);
+          int advance;
+          stbtt_GetCodepointHMetrics(&tr->font, ' ', &advance, NULL);
+          sel_entry.w = advance * scale_y;
+        }
+
+        DA_APPEND(tr->sel_ssbo_data, sel_entry);
+      }
+
+      f32 line_wrap_width = tr_measure_text(tr, LINE_WRAP_MARKER,
+                                            ARRAY_LEN(LINE_WRAP_MARKER) - 1);
+
+      f32 old_x = x;
+      x = begin_x + line_wrap_width;
+      y += tr->scale;
+      sel_begin_x = x;
+      sel_end_x = x;
+      x += old_x - text_entry.x;
+      text_entry.x = begin_x + line_wrap_width;
+      text_entry.y += tr->scale;
+
+      tr_draw_text(tr, LINE_WRAP_MARKER, ARRAY_LEN(LINE_WRAP_MARKER) - 1, begin_x, y);
+
+      last_wrap_i = i;
+    }
+
+    DA_APPEND(tr->text_ssbo_data, text_entry);
 
     if (tr->line_index == tr->sel_begin_row && i < tr->sel_begin_col)
       sel_begin_x = x;
+
     if (tr->line_index != tr->sel_end_row || i < tr->sel_end_col)
       sel_end_x = x;
   }
 
   if (tr->line_index >= tr->sel_begin_row &&
-      tr->line_index <= tr->sel_end_row) {
-    SelSSBOEntry entry = {
+      tr->line_index <= tr->sel_end_row &&
+      (tr->line_index != tr->sel_end_row ||
+       last_wrap_i < tr->sel_end_col)) {
+    SelSSBOEntry sel_entry = {
       sel_begin_x, y,
       sel_end_x - sel_begin_x, tr->scale,
-      tr->acc_r, tr->acc_g, tr->acc_b,
+      tr->sel_r, tr->sel_g, tr->sel_b,
       {},
     };
 
-    if (entry.w == 0.0) {
+    if (sel_entry.w == 0.0 || tr->sel_end_row > tr->line_index) {
       f32 scale_y = stbtt_ScaleForPixelHeight(&tr->font, tr->scale);
       int advance;
       stbtt_GetCodepointHMetrics(&tr->font, ' ', &advance, NULL);
-      entry.w = advance * scale_y;
+      sel_entry.w += advance * scale_y;
     }
 
-    DA_APPEND(tr->sel_ssbo_data, entry);
+    DA_APPEND(tr->sel_ssbo_data, sel_entry);
   }
 
   ++tr->line_index;
+
+  return y + tr->scroll + tr->scale;
 }
 
 void tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
+  y -= tr->scroll;
+
   for (u32 i = 0; i < text_len; ++i) {
     TextSSBOEntry entry = {
       x, y,       // Modified by get_char_data
