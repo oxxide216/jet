@@ -78,7 +78,7 @@ i32 main(i32 argc, char **argv) {
   while (is_running) {
     WinxEvent event;
     while ((event = winx_get_event(window, false)).kind != WinxEventKindNone) {
-      is_running = event.kind != WinxEventKindQuit;
+      is_running &= event.kind != WinxEventKindQuit;
       if (!is_running)
         break;
 
@@ -263,6 +263,11 @@ i32 main(i32 argc, char **argv) {
               editor.current_file_path = NULL;
             }
           }
+        } break;
+
+        case WinxKeyCodeQ: {
+          if (is_ctrl_pressed)
+            is_running = false;
         } break;
 
         case WinxKeyCodeEscape: {
