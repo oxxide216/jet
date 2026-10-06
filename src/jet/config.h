@@ -4,7 +4,7 @@
 #define SPACES_PER_TAB 2
 
 #define NEW_FILE_NAME    U"<New file>"
-#define LINE_WRAP_MARKER U"→ "
+#define LINE_WRAP_MARKER U"→"
 
 #define MAX_FONT_SCALE     240.0
 #define MIN_FONT_SCALE     8.0

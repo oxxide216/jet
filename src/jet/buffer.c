@@ -216,11 +216,9 @@ void buffer_move_down(Buffer *buffer, bool is_selecting, u32 max_visual_line_len
       buffer->cursor_col += max_visual_line_len - rem - 1;
     else
       buffer->cursor_col += max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
-    buffer->desired_col = buffer->cursor_col;
   } else if (buffer->cursor_col + max_visual_line_len <=
              line->len + ARRAY_LEN(LINE_WRAP_MARKER)) {
     buffer->cursor_col += max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
-    buffer->desired_col = buffer->cursor_col;
   } else if (buffer->cursor_row + 1 < buffer->lines.len) {
     ++buffer->cursor_row;
 
@@ -231,7 +229,6 @@ void buffer_move_down(Buffer *buffer, bool is_selecting, u32 max_visual_line_len
         ++buffer->cursor_col;
       buffer->cursor_col %= max_visual_line_len;
       buffer->cursor_col += ARRAY_LEN(LINE_WRAP_MARKER) - flag;
-      buffer->desired_col = buffer->cursor_col;
     }
 
     Line *line = buffer->lines.items + buffer->cursor_row;
@@ -251,7 +248,6 @@ void buffer_move_up(Buffer *buffer, bool is_selecting, u32 max_visual_line_len) 
 
   if (buffer->cursor_col > max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER)) {
     buffer->cursor_col -= max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
-    buffer->desired_col = buffer->cursor_col;
   } else if (buffer->cursor_row > 0) {
     --buffer->cursor_row;
 
@@ -272,7 +268,6 @@ void buffer_move_up(Buffer *buffer, bool is_selecting, u32 max_visual_line_len) 
         buffer->cursor_col -= rem + 1;
       else
         buffer->cursor_col -= ARRAY_LEN(LINE_WRAP_MARKER);
-      buffer->desired_col = buffer->cursor_col;
     }
   }
 }
@@ -498,11 +493,10 @@ void buffer_read_file(Buffer *buffer, char *path) {
 
   fclose(file);
 
-  buffer->anchor_row = 0;
-  buffer->anchor_col = 0;
   buffer->cursor_row = 0;
   buffer->cursor_col = 0;
   buffer->desired_col = buffer->cursor_col;
+  buffer->is_selecting = false;
 }
 
 void buffer_write_file(Buffer *buffer, char *path) {

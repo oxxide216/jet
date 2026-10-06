@@ -19,7 +19,8 @@ static TextVertex vertices[4] = {0};
 
 static u32 indices[] = { 0, 1, 2, 2, 1, 3 };
 
-TextRenderer tr_make(VikInstance *instance,
+TextRenderer tr_make(WinxWindow *window,
+                     VikInstance *instance,
                      VikExecutor *executor,
                      Str font,
                      Str text_vert_bc,
@@ -27,6 +28,7 @@ TextRenderer tr_make(VikInstance *instance,
                      Str sel_vert_bc,
                      Str sel_frag_bc) {
   TextRenderer tr = {0};
+  tr.window = window;
   tr.instance = instance;
   tr.executor = executor;
 
@@ -267,7 +269,8 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y, f32 x_
                   &text_entry.br_u, &text_entry.br_v);
 
     if (x > x_limit) {
-      if (tr->line_index > tr->sel_begin_row ||
+      if ((tr->line_index > tr->sel_begin_row &&
+           tr->line_index < tr->sel_end_row) ||
           (tr->line_index == tr->sel_begin_row &&
            i > tr->sel_begin_col)) {
         SelSSBOEntry sel_entry = {
@@ -276,13 +279,6 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y, f32 x_
           tr->sel_r, tr->sel_g, tr->sel_b,
           {},
         };
-
-        if (sel_entry.w == 0.0) {
-          f32 scale_y = stbtt_ScaleForPixelHeight(&tr->font, tr->scale);
-          int advance;
-          stbtt_GetCodepointHMetrics(&tr->font, ' ', &advance, NULL);
-          sel_entry.w = advance * scale_y;
-        }
 
         DA_APPEND(tr->sel_ssbo_data, sel_entry);
       }
@@ -299,12 +295,16 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y, f32 x_
       text_entry.x = begin_x + line_wrap_width;
       text_entry.y += tr->scale;
 
-      tr_draw_text(tr, LINE_WRAP_MARKER, ARRAY_LEN(LINE_WRAP_MARKER) - 1, begin_x, y);
+      tr_draw_text(tr, LINE_WRAP_MARKER,
+                   ARRAY_LEN(LINE_WRAP_MARKER) - 1,
+                   begin_x, y + tr->scroll);
 
       last_wrap_i = i;
     }
 
-    DA_APPEND(tr->text_ssbo_data, text_entry);
+    if (text_entry.y + text_entry.h > 0.0 &&
+        text_entry.y < tr->window->height)
+      DA_APPEND(tr->text_ssbo_data, text_entry);
 
     if (tr->line_index == tr->sel_begin_row && i < tr->sel_begin_col)
       sel_begin_x = x;

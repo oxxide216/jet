@@ -1,4 +1,5 @@
 // TODO: palette scroll
+// TODO: do not render invisible lines above the screen
 
 #include "shl/shl-defs.h"
 #include "viking/viking.h"
@@ -78,7 +79,7 @@ i32 main(i32 argc, char **argv) {
   VikInstance *instance = vik_make_instance(window, VikRequestFlagsNone, false);
   VikExecutor *executor = vik_make_executor(instance);
 
-  TextRenderer tr = tr_make(instance, executor,
+  TextRenderer tr = tr_make(window, instance, executor,
                             fonts_MonaspaceNeon_Regular_otf,
                             build_shaders_text_vert_spv,
                             build_shaders_text_frag_spv,
@@ -86,7 +87,7 @@ i32 main(i32 argc, char **argv) {
                             build_shaders_sel_frag_spv);
   tr_resize(&tr, window->width, window->height);
 
-  TextRenderer ptr = tr_make(instance, executor,
+  TextRenderer ptr = tr_make(window, instance, executor,
                              fonts_MonaspaceNeon_Regular_otf,
                              build_shaders_text_vert_spv,
                              build_shaders_text_frag_spv,
@@ -173,6 +174,8 @@ i32 main(i32 argc, char **argv) {
                 if (editor.provider->execute(&editor, editor.selected_option)) {
                   editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
                   editor.mode = JetModeEditor;
+                } else {
+                  buffer_remove_line(&editor.palette_buffer);
                 }
               }
             }
@@ -400,17 +403,6 @@ i32 main(i32 argc, char **argv) {
       }
     }
 
-    // Scroll
-    {
-      if (CURRENT_SCROLL() > (float) CURRENT_BUFFER().anchor_row * editor.font_scale)
-        CURRENT_SCROLL() = (float) CURRENT_BUFFER().anchor_row * editor.font_scale;
-      else if (CURRENT_SCROLL() + (window->height - BUFFER_PADDING * 2.0) <
-               (float) (CURRENT_BUFFER().cursor_row + 1) * editor.font_scale)
-        CURRENT_SCROLL() =
-          (float) (CURRENT_BUFFER().cursor_row + 1) * editor.font_scale -
-          (window->height - BUFFER_PADDING * 2.0);
-    }
-
     if (!vik_begin_frame(executor, BG_COLOR, 1.0)) {
       winx_draw(window);
       continue;
@@ -439,10 +431,21 @@ i32 main(i32 argc, char **argv) {
 
     f32 y = BUFFER_PADDING;
     for (u32 i = 0; i < CURRENT_BUFFER().lines.len; ++i) {
+      if (i >= CURRENT_BUFFER().cursor_row &&
+          CURRENT_SCROLL() > y - BUFFER_PADDING)
+        CURRENT_SCROLL() = y - BUFFER_PADDING;
+
       Line *line = CURRENT_BUFFER().lines.items + i;
       y = tr_draw_line(&tr, line->items, line->len,
                        BUFFER_PADDING, y,
                        window->width - BUFFER_PADDING * 2.0);
+
+      if (CURRENT_SCROLL() < y - (window->height - BUFFER_PADDING)) {
+        if (i <= CURRENT_BUFFER().cursor_row)
+          CURRENT_SCROLL() = y - (window->height - BUFFER_PADDING);
+        else
+          break;
+      }
     }
 
     if (editor.mode == JetModeCommandPalette) {

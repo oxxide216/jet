@@ -1,6 +1,7 @@
 #ifndef TEXT_RENDERER_H
 #define TEXT_RENDERER_H
 
+#include "winx/winx.h"
 #include "viking/viking.h"
 #include "stb_truetype.h"
 
@@ -51,6 +52,7 @@ typedef struct {
   u32             max_sel_ssbo_data_len;
   u8             *atlas_data;
   u32             atlas_cursor_x;
+  WinxWindow     *window;
   VikInstance    *instance;
   VikExecutor    *executor;
   VikBuffer      *ubo;
@@ -74,7 +76,8 @@ typedef struct {
   bool            is_ubo_data_dirty;
 } TextRenderer;
 
-TextRenderer tr_make(VikInstance *instance,
+TextRenderer tr_make(WinxWindow *window,
+                     VikInstance *instance,
                      VikExecutor *executor,
                      Str font,
                      Str text_vert_bc,
