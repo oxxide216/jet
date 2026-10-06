@@ -16,6 +16,12 @@
 #define SHL_STR_IMPLEMENTATION
 #include "shl/shl-str.h"
 
+#define CURRENT_BUFFER()                                             \
+  editor.main_buffers.items[editor.current_main_buffer_index].buffer
+
+#define CURRENT_FILE_PATH()                                             \
+  editor.main_buffers.items[editor.current_main_buffer_index].file_path
+
 i32 main(i32 argc, char **argv) {
   Winx *winx = winx_init();
   WinxWindow *window = winx_init_window(winx, STR_LIT("Jet"),
@@ -52,9 +58,10 @@ i32 main(i32 argc, char **argv) {
 
   Editor editor = {0};
 
-  editor.editor_buffer = buffer_make();
+  MainBuffer main_buffer = { buffer_make(), NULL };
+  DA_APPEND(editor.main_buffers, main_buffer);
   editor.palette_buffer = buffer_make();
-  editor.current_buffer = &editor.editor_buffer;
+  editor.current_buffer = &editor.main_buffers.items[0].buffer;
 
   editor.mode = JetModeEditor;
 
@@ -62,7 +69,14 @@ i32 main(i32 argc, char **argv) {
 
   if (argc > 1) {
     buffer_read_file(editor.current_buffer, argv[1]);
-    editor.current_file_path = strdup(argv[1]);
+    editor.main_buffers.items[0].file_path = strdup(argv[1]);
+
+    for (u32 i = 2; i < (u32) argc; ++i) {
+      MainBuffer main_buffer = { buffer_make(), NULL };
+      buffer_read_file(&main_buffer.buffer, argv[i]);
+      main_buffer.file_path = strdup(argv[i]);
+      DA_APPEND(editor.main_buffers, main_buffer);
+    }
   }
 
   bool is_running = true;
@@ -109,7 +123,7 @@ i32 main(i32 argc, char **argv) {
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
                 if (editor.provider->execute(&editor, editor.selected_option)) {
-                  editor.current_buffer = &editor.editor_buffer;
+                  editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
                   editor.mode = JetModeEditor;
                 }
               }
@@ -149,17 +163,33 @@ i32 main(i32 argc, char **argv) {
         } break;
 
         case WinxKeyCodeLeft: {
-          if (is_ctrl_pressed)
-            buffer_move_left_word(editor.current_buffer);
-          else
+          if (is_ctrl_pressed) {
+            if (is_alt_pressed) {
+              if (editor.current_main_buffer_index > 0)
+                --editor.current_main_buffer_index;
+              else
+                editor.current_main_buffer_index = editor.main_buffers.len - 1;
+            } else {
+              buffer_move_left_word(editor.current_buffer);
+            }
+          } else {
             buffer_move_left(editor.current_buffer);
+          }
         } break;
 
         case WinxKeyCodeRight: {
-          if (is_ctrl_pressed)
-            buffer_move_right_word(editor.current_buffer);
-          else
+          if (is_ctrl_pressed) {
+            if (is_alt_pressed) {
+              if (editor.current_main_buffer_index + 1 < editor.main_buffers.len)
+                ++editor.current_main_buffer_index;
+              else
+                editor.current_main_buffer_index = 0;
+            } else {
+              buffer_move_right_word(editor.current_buffer);
+            }
+          } else {
             buffer_move_right(editor.current_buffer);
+          }
         } break;
 
         case WinxKeyCodeDown: {
@@ -209,7 +239,7 @@ i32 main(i32 argc, char **argv) {
               editor.mode = JetModeCommandPalette;
               buffer_delete_line(editor.current_buffer);
             } else if (editor.mode == JetModeCommandPalette) {
-              editor.current_buffer = &editor.editor_buffer;
+              editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
               editor.mode = JetModeEditor;
             }
           }
@@ -241,25 +271,23 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeS: {
           if (is_ctrl_pressed && editor.mode == JetModeEditor) {
-            if (is_shift_pressed || !editor.current_file_path) {
+            if (is_shift_pressed || !CURRENT_FILE_PATH()) {
               editor.current_buffer = &editor.palette_buffer;
               editor.provider = &save_file_provider;
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
               buffer_delete_line(editor.current_buffer);
             } else {
-              buffer_write_file(editor.current_buffer, editor.current_file_path);
+              buffer_write_file(editor.current_buffer, CURRENT_FILE_PATH());
             }
           }
         } break;
 
         case WinxKeyCodeN: {
-          if (is_ctrl_pressed) {
-            buffer_reset(&editor.editor_buffer);
-            if (editor.current_file_path) {
-              free(editor.current_file_path);
-              editor.current_file_path = NULL;
-            }
+          if (is_ctrl_pressed && editor.mode == JetModeEditor) {
+            editor.current_main_buffer_index = editor.main_buffers.len;
+            MainBuffer main_buffer = { buffer_make(), NULL };
+            DA_APPEND(editor.main_buffers, main_buffer);
           }
         } break;
 
@@ -270,7 +298,7 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeEscape: {
           if (editor.mode == JetModeCommandPalette) {
-            editor.current_buffer = &editor.editor_buffer;
+            editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
             editor.mode = JetModeEditor;
           }
         } break;
@@ -308,12 +336,12 @@ i32 main(i32 argc, char **argv) {
                    editor.palette_buffer.cursor_col + 1);
     sr_begin_frame(&sr);
     tr_begin_frame(&tr, editor.font_scale,
-                   editor.editor_buffer.cursor_row,
-                   editor.editor_buffer.cursor_col,
-                   editor.editor_buffer.cursor_row,
-                   editor.editor_buffer.cursor_col + 1);
-    for (u32 i = 0; i < editor.editor_buffer.lines.len; ++i) {
-      Line *line = editor.editor_buffer.lines.items + i;
+                   CURRENT_BUFFER().cursor_row,
+                   CURRENT_BUFFER().cursor_col,
+                   CURRENT_BUFFER().cursor_row,
+                   CURRENT_BUFFER().cursor_col + 1);
+    for (u32 i = 0; i < CURRENT_BUFFER().lines.len; ++i) {
+      Line *line = CURRENT_BUFFER().lines.items + i;
       tr_draw_line(&tr, line->items, line->len,
                    BUFFER_PADDING,
                    BUFFER_PADDING + editor.font_scale * i);
@@ -396,11 +424,14 @@ i32 main(i32 argc, char **argv) {
     winx_draw(window);
   }
 
-  if (editor.current_file_path)
-    free(editor.current_file_path);
-
   buffer_delete(&editor.palette_buffer);
-  buffer_delete(&editor.editor_buffer);
+  for (u32 i = 0; i < editor.main_buffers.len; ++i) {
+    buffer_delete(&editor.main_buffers.items[i].buffer);
+    if (editor.main_buffers.items[i].file_path)
+      free(editor.main_buffers.items[i].file_path);
+  }
+  if (editor.main_buffers.items)
+    free(editor.main_buffers.items);
 
   sr_delete(&sr);
   tr_delete(&ptr);

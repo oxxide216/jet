@@ -4,17 +4,23 @@
 #include "buffer.h"
 #include "provider.h"
 
+typedef struct {
+  Buffer  buffer;
+  char   *file_path;
+} MainBuffer;
+
+typedef Da(MainBuffer) MainBuffers;
+
 typedef enum {
   JetModeEditor = 0,
   JetModeCommandPalette,
 } JetMode;
 
 struct Editor {
-  Buffer  editor_buffer;
-  Buffer  palette_buffer;
-  Buffer *current_buffer;
-
-  char *current_file_path;
+  MainBuffers  main_buffers;
+  Buffer       palette_buffer;
+  Buffer      *current_buffer;
+  u32          current_main_buffer_index;
 
   Provider *provider;
   WideStrs  options;

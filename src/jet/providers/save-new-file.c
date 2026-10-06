@@ -19,9 +19,10 @@ static void free_opts(WideStrs options) {
 static bool execute(Editor *editor, u32 index) {
   (void) index;
 
+  MainBuffer *current_buffer = editor->main_buffers.items + editor->current_main_buffer_index;
   char *path = wide_str_to_cstr(buffer_get_current_line(editor->current_buffer));
-  buffer_write_file(&editor->editor_buffer, path);
-  editor->current_file_path = path;
+  buffer_write_file(&current_buffer->buffer, path);
+  current_buffer->file_path = path;
 
   return true;
 }

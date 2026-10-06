@@ -60,7 +60,7 @@ static bool execute(Editor *editor, u32 index) {
 
   // Whether or not it is a regular file
   if (S_ISREG(stat_data.st_mode)) {
-    buffer_write_file(&editor->editor_buffer, path);
+    buffer_write_file(&editor->main_buffers.items[editor->current_main_buffer_index].buffer, path);
 
     free(path);
     return true;

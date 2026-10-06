@@ -46,11 +46,10 @@ static bool execute(Editor *editor, u32 index) {
 
   // Whether or not it is a regular file
   if (S_ISREG(stat_data.st_mode)) {
-    buffer_reset(&editor->editor_buffer);
-    buffer_read_file(&editor->editor_buffer, path);
-    if (editor->current_file_path)
-      free(editor->current_file_path);
-    editor->current_file_path = path;
+    editor->current_main_buffer_index = editor->main_buffers.len;
+    MainBuffer main_buffer = { buffer_make(), path };
+    buffer_read_file(&main_buffer.buffer, path);
+    DA_APPEND(editor->main_buffers, main_buffer);
 
     return true;
   } else {
