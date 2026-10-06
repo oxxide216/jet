@@ -422,6 +422,7 @@ void buffer_goto_line_begin(Buffer *buffer, bool is_selecting) {
   buffer->is_selecting = is_selecting;
 
   buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
 }
 
 void buffer_goto_line_end(Buffer *buffer, bool is_selecting) {
@@ -447,6 +448,7 @@ void buffer_goto_buffer_begin(Buffer *buffer, bool is_selecting) {
 
   buffer->cursor_row = 0;
   buffer->cursor_col = 0;
+  buffer->desired_col = buffer->cursor_col;
 }
 
 void buffer_goto_buffer_end(Buffer *buffer, bool is_selecting) {
