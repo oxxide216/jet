@@ -56,11 +56,9 @@ i32 main(i32 argc, char **argv) {
   editor.palette_buffer = buffer_make();
   editor.current_buffer = &editor.editor_buffer;
 
-  editor.provider = &command_provider;
-
   editor.mode = JetModeEditor;
 
-  editor.font_scale = 24.0;
+  editor.font_scale = DEFAULT_FONT_SCALE;
 
   if (argc > 1) {
     buffer_read_file(editor.current_buffer, argv[1]);
