@@ -17,3 +17,15 @@ cc -o nsb nsb.c
 ./nsb
 ./jet
 ```
+
+## Why?
+
+Jet is not a VS Code, Vim, Neovim, Emacs or whatever killer.
+I just wanted to create something that I could use daily myself.
+This is why main roadmap for Jet - features that **I** need daily.
+
+## What `Jet` means?
+
+Jets are things in space that come from quasars and pulsars.
+They are very fast, powerful and beautiful.
+This is how I want Jet to be: fast, powerful and beautiful.
