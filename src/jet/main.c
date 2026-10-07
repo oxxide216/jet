@@ -362,16 +362,18 @@ i32 main(i32 argc, char **argv) {
         } break;
 
         case WinxKeyCodeK: {
-          buffer_delete(&CURRENT_BUFFER());
-          if (CURRENT_FILE_PATH())
-            free(CURRENT_FILE_PATH());
-          DA_REMOVE_AT(editor.main_buffers, editor.current_main_buffer_index);
-          if (editor.main_buffers.len == 0) {
-            MainBuffer main_buffer = main_buffer_make(NULL);
-            DA_APPEND(editor.main_buffers, main_buffer);
+          if (is_ctrl_pressed) {
+            buffer_delete(&CURRENT_BUFFER());
+            if (CURRENT_FILE_PATH())
+              free(CURRENT_FILE_PATH());
+            DA_REMOVE_AT(editor.main_buffers, editor.current_main_buffer_index);
+            if (editor.main_buffers.len == 0) {
+              MainBuffer main_buffer = main_buffer_make(NULL);
+              DA_APPEND(editor.main_buffers, main_buffer);
+            }
+            if (editor.current_main_buffer_index > 0)
+              --editor.current_main_buffer_index;
           }
-          if (editor.current_main_buffer_index > 0)
-            --editor.current_main_buffer_index;
         } break;
 
         case WinxKeyCodeEscape: {
