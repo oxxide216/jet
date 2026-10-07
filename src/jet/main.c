@@ -579,6 +579,9 @@ i32 main(i32 argc, char **argv) {
       str.x_lower_limit = 0.0;
       str.x_higher_limit = window->width;
 
+      tr_set_bg_color(&str, FG_COLOR);
+      tr_set_fg_color(&str, BG_COLOR);
+
       f32 y = window->height - (editor.font_scale + BUFFER_PADDING);
 
       sr_draw_rect(&sr,
