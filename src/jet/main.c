@@ -564,6 +564,9 @@ i32 main(i32 argc, char **argv) {
     }
 
     {
+      ptr.x_lower_limit = 0.0;
+      ptr.x_higher_limit = window->width;
+
       f32 y = window->height - (editor.font_scale + BUFFER_PADDING);
 
       sr_draw_rect(&sr,
