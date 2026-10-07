@@ -11,6 +11,9 @@ Jet is a lightweight text/code editor, written from scratch in C using Vulkan an
 Jet uses [my custom build system](https://github.com/oxxide216/nsb).
 
 ```shell
+git clone --recursive https://github.com/oxxide216/jet
+cd jet
 cc -o nsb nsb.c
 ./nsb
+./jet
 ```
