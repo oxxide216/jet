@@ -303,7 +303,9 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y, f32 x_
     }
 
     if (text_entry.y + text_entry.h > 0.0 &&
-        text_entry.y < tr->window->height)
+        text_entry.y < tr->window->height &&
+        text_entry.x >= tr->x_lower_limit &&
+        text_entry.x + text_entry.w < tr->x_higher_limit)
       DA_APPEND(tr->text_ssbo_data, text_entry);
 
     if (tr->line_index == tr->sel_begin_row && i < tr->sel_begin_col)
@@ -343,7 +345,7 @@ void tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
   y -= tr->scroll;
 
   for (u32 i = 0; i < text_len; ++i) {
-    TextSSBOEntry entry = {
+    TextSSBOEntry text_entry = {
       x, y,       // Modified by get_char_data
       10.0, 10.0, // Overwritten by get_char_data
       0.0, 0.0,   // Overwritten by get_char_data
@@ -352,11 +354,13 @@ void tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
       {},
     };
     get_char_data(tr, text[i], tr->scale,
-                  &x, &entry.y,
-                  &entry.w, &entry.h,
-                  &entry.tl_u, &entry.tl_v,
-                  &entry.br_u, &entry.br_v);
-    DA_APPEND(tr->text_ssbo_data, entry);
+                  &x, &text_entry.y,
+                  &text_entry.w, &text_entry.h,
+                  &text_entry.tl_u, &text_entry.tl_v,
+                  &text_entry.br_u, &text_entry.br_v);
+    if (text_entry.x >= tr->x_lower_limit &&
+        text_entry.x + text_entry.w < tr->x_higher_limit)
+      DA_APPEND(tr->text_ssbo_data, text_entry);
   }
 }
 

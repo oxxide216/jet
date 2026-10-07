@@ -16,6 +16,7 @@ typedef struct {
   u32   cursor_col;
   u32   desired_col;
   bool  is_selecting;
+  bool  is_dirty;
 } Buffer;
 
 Buffer buffer_make(void);

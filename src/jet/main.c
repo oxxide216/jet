@@ -1,5 +1,5 @@
-// TODO: palette scroll
 // TODO: do not render invisible lines above the screen
+#include <wchar.h>
 
 #include "shl/shl-defs.h"
 #include "viking/viking.h"
@@ -429,23 +429,27 @@ i32 main(i32 argc, char **argv) {
                      CURRENT_SCROLL());
     }
 
+    tr.x_lower_limit = 0.0;
+    tr.x_higher_limit = window->width;
+
     f32 y = BUFFER_PADDING;
     for (u32 i = 0; i < CURRENT_BUFFER().lines.len; ++i) {
       if (i >= CURRENT_BUFFER().cursor_row &&
-          CURRENT_SCROLL() > y - BUFFER_PADDING)
+          CURRENT_SCROLL() > y - BUFFER_PADDING) {
         CURRENT_SCROLL() = y - BUFFER_PADDING;
+      } else if (CURRENT_SCROLL() <
+                 y - (window->height - BUFFER_PADDING * 2.0 - editor.font_scale * 2.0)) {
+        if (i <= CURRENT_BUFFER().cursor_row)
+          CURRENT_SCROLL() =
+            y - (window->height - BUFFER_PADDING * 2.0 - editor.font_scale * 2.0);
+        else
+          break;
+      }
 
       Line *line = CURRENT_BUFFER().lines.items + i;
       y = tr_draw_line(&tr, line->items, line->len,
                        BUFFER_PADDING, y,
                        window->width - BUFFER_PADDING * 2.0);
-
-      if (CURRENT_SCROLL() < y - (window->height - BUFFER_PADDING)) {
-        if (i <= CURRENT_BUFFER().cursor_row)
-          CURRENT_SCROLL() = y - (window->height - BUFFER_PADDING);
-        else
-          break;
-      }
     }
 
     if (editor.mode == JetModeCommandPalette) {
@@ -453,6 +457,14 @@ i32 main(i32 argc, char **argv) {
 
       tr_set_bg_color(&ptr, BG_COLOR);
       tr_set_fg_color(&ptr, FG_COLOR);
+
+      ptr.x_lower_limit =
+        window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 +
+        PALETTE_BORDER_WIDTH + BUFFER_PADDING;
+      ptr.x_higher_limit =
+        ptr.x_lower_limit +
+        window->width * PALETTE_WIDTH_FACTOR -
+        PALETTE_BORDER_WIDTH * 2.0 - BUFFER_PADDING * 2.0;
 
       // Shadow
       sr_draw_rounded_rect(&sr,
@@ -485,16 +497,46 @@ i32 main(i32 argc, char **argv) {
                    window->width * PALETTE_WIDTH_FACTOR,
                    PALETTE_BORDER_WIDTH,
                    FG_COLOR, PALETTE_ALPHA);
+
+      f32 line0_width =
+        tr_measure_text(&ptr, line.ptr, editor.palette_buffer.cursor_col);
+
+      f32 line1_width;
+      if (editor.palette_buffer.cursor_col < line.len) {
+        line1_width =
+          tr_measure_text(&ptr, line.ptr, editor.palette_buffer.cursor_col + 1);
+      } else {
+        u32 space = U' ';
+        line1_width =
+          tr_measure_text(&ptr, line.ptr, editor.palette_buffer.cursor_col) +
+          tr_measure_text(&ptr, &space, 1);
+      }
+
+      if (line0_width - editor.palette_scroll_x < 0.0) {
+        editor.palette_scroll_x = line0_width;
+      } else if (line1_width - editor.palette_scroll_x >
+                 window->width * PALETTE_WIDTH_FACTOR -
+                 PALETTE_BORDER_WIDTH * 2.0 -
+                 BUFFER_PADDING * 2.0) {
+        editor.palette_scroll_x =
+          line1_width -
+          (window->width * PALETTE_WIDTH_FACTOR -
+           PALETTE_BORDER_WIDTH * 2.0 -
+           BUFFER_PADDING * 2.0);
+      }
+
       tr_draw_line(&ptr, line.ptr, line.len,
-                   window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH,
+                   window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH - editor.palette_scroll_x,
                    window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH,
                    INFINITY);
 
       editor.provider->free_opts(editor.options);
       editor.options = editor.provider->get_opts(line);
 
-      // TODO: scroll here too
-      for (u32 i = 0; i < editor.options.len; ++i) {
+      if (editor.palette_scroll_y > editor.selected_option)
+        editor.palette_scroll_y = editor.selected_option;
+
+      for (u32 i = editor.palette_scroll_y; i < editor.options.len; ++i) {
         WideStr *option = editor.options.items + i;
         f32 x = window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH;
         f32 y = window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 3.0 + PALETTE_BORDER_WIDTH + editor.font_scale * (i + 1);
@@ -519,6 +561,35 @@ i32 main(i32 argc, char **argv) {
 
         tr_draw_text(&ptr, option->ptr, option->len, x, y);
       }
+    }
+
+    {
+      f32 y = window->height - (editor.font_scale + BUFFER_PADDING);
+
+      sr_draw_rect(&sr,
+                   0.0,
+                   y,
+                   window->width,
+                   editor.font_scale + BUFFER_PADDING,
+                   FG_COLOR, 1.0);
+
+      u32 buffer[512];
+      static_assert(sizeof(u32) == sizeof(wchar_t));
+      u32 len = swprintf((i32 *) buffer, ARRAY_LEN(buffer), L"%u:%u",
+                         CURRENT_BUFFER().cursor_row + 1,
+                         CURRENT_BUFFER().cursor_col + 1);
+      tr_draw_text(&ptr, buffer, len, BUFFER_PADDING, y + BUFFER_PADDING * 0.5);
+
+      char *file_path = CURRENT_FILE_PATH();
+      if (!file_path)
+        file_path = "<no file>";
+      len = 0;
+      while (*file_path)
+        buffer[len++] = *file_path++;
+      if (CURRENT_BUFFER().is_dirty)
+        buffer[len++] = U'*';
+      f32 x = window->width - tr_measure_text(&ptr, buffer, len) - BUFFER_PADDING;
+      tr_draw_text(&ptr, buffer, len, x, y + BUFFER_PADDING * 0.5);
     }
 
     tr_end_frame(&tr);

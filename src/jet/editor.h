@@ -26,6 +26,8 @@ struct Editor {
   Provider *provider;
   WideStrs  options;
   u32       selected_option;
+  f32       palette_scroll_x;
+  u32       palette_scroll_y;
 
   JetMode mode;
 

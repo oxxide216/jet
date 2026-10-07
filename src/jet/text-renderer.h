@@ -71,6 +71,8 @@ typedef struct {
   u32             sel_end_row;
   u32             sel_end_col;
   f32             scroll;
+  f32             x_lower_limit;
+  f32             x_higher_limit;
   u32             line_index;
   bool            is_glyphs_cache_dirty;
   bool            is_ubo_data_dirty;

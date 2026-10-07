@@ -22,6 +22,7 @@ void buffer_reset(Buffer *buffer) {
   buffer->cursor_row = 0;
   buffer->cursor_col = 0;
   buffer->desired_col = buffer->cursor_col;
+  buffer->is_dirty = false;
 }
 
 static void get_buffer_selection_bounds(Buffer *buffer,
@@ -90,6 +91,7 @@ static void buffer_remove_selection(Buffer *buffer) {
   buffer->cursor_row = min_row;
   buffer->cursor_col = min_col;
   buffer->is_selecting = false;
+  buffer->is_dirty = true;
 }
 
 void buffer_insert(Buffer *buffer, u32 _char) {
@@ -102,6 +104,8 @@ void buffer_insert(Buffer *buffer, u32 _char) {
   buffer->desired_col = buffer->cursor_col;
 
   buffer->anchor_col = buffer->cursor_col;
+
+  buffer->is_dirty = true;
 }
 
 void buffer_insert_new_line(Buffer *buffer) {
@@ -124,6 +128,8 @@ void buffer_insert_new_line(Buffer *buffer) {
 
   buffer->anchor_col = buffer->cursor_col;
   buffer->anchor_row = buffer->cursor_row;
+
+  buffer->is_dirty = true;
 }
 
 void buffer_remove_before_cursor(Buffer *buffer) {
@@ -137,12 +143,16 @@ void buffer_remove_before_cursor(Buffer *buffer) {
     --buffer->cursor_col;
     buffer->desired_col = buffer->cursor_col;
     DA_REMOVE_AT(*line, buffer->cursor_col);
+
+    buffer->is_dirty = true;
   } else if (buffer->cursor_row > 0) {
     --buffer->cursor_row;
     Line *line = buffer->lines.items + buffer->cursor_row;
     buffer->cursor_col = line->len;
     buffer->desired_col = buffer->cursor_col;
     merge_line_down(buffer, buffer->cursor_row);
+
+    buffer->is_dirty = true;
   }
 }
 
@@ -153,10 +163,15 @@ void buffer_remove_at_cursor(Buffer *buffer) {
   }
 
   Line *line = buffer->lines.items + buffer->cursor_row;
-  if (buffer->cursor_col < line->len)
+  if (buffer->cursor_col < line->len) {
     DA_REMOVE_AT(*line, buffer->cursor_col);
-  else if (buffer->cursor_row + 1 < buffer->lines.len)
+
+    buffer->is_dirty = true;
+  } else if (buffer->cursor_row + 1 < buffer->lines.len) {
     merge_line_down(buffer, buffer->cursor_row);
+
+    buffer->is_dirty = true;
+  }
 }
 
 void buffer_move_left(Buffer *buffer, bool is_selecting) {
@@ -292,6 +307,8 @@ void buffer_remove_word_before_cursor(Buffer *buffer) {
     --buffer->cursor_col;
     buffer->desired_col = buffer->cursor_col;
     DA_REMOVE_AT(*line, buffer->cursor_col);
+
+    buffer->is_dirty = true;
   }
 }
 
@@ -313,6 +330,8 @@ void buffer_remove_word_at_cursor(Buffer *buffer) {
     if (iswalnum(line->items[buffer->cursor_col]))
       found_word = true;
     DA_REMOVE_AT(*line, buffer->cursor_col);
+
+    buffer->is_dirty = true;
   }
 }
 
@@ -466,6 +485,7 @@ void buffer_remove_line(Buffer *buffer) {
   buffer->cursor_col = 0;
   buffer->desired_col = buffer->cursor_col;
   buffer->is_selecting = false;
+  buffer->is_dirty = true;
 }
 
 void buffer_delete(Buffer *buffer) {
@@ -497,6 +517,7 @@ void buffer_read_file(Buffer *buffer, char *path) {
   buffer->cursor_col = 0;
   buffer->desired_col = buffer->cursor_col;
   buffer->is_selecting = false;
+  buffer->is_dirty = false;
 }
 
 void buffer_write_file(Buffer *buffer, char *path) {
@@ -513,6 +534,8 @@ void buffer_write_file(Buffer *buffer, char *path) {
   }
 
   fclose(file);
+
+  buffer->is_dirty = false;
 }
 
 WideStr buffer_get_prev_line(Buffer *buffer) {
