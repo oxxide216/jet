@@ -87,6 +87,14 @@ i32 main(i32 argc, char **argv) {
                             build_shaders_sel_frag_spv);
   tr_resize(&tr, window->width, window->height);
 
+  TextRenderer str = tr_make(window, instance, executor,
+                             fonts_MonaspaceNeon_Regular_otf,
+                             build_shaders_text_vert_spv,
+                             build_shaders_text_frag_spv,
+                             build_shaders_sel_vert_spv,
+                             build_shaders_sel_frag_spv);
+  tr_resize(&str, window->width, window->height);
+
   TextRenderer ptr = tr_make(window, instance, executor,
                              fonts_MonaspaceNeon_Regular_otf,
                              build_shaders_text_vert_spv,
@@ -146,6 +154,7 @@ i32 main(i32 argc, char **argv) {
       switch (event.kind) {
       case WinxEventKindResize: {
         tr_resize(&tr, event.as.resize.width, event.as.resize.height);
+        tr_resize(&str, event.as.resize.width, event.as.resize.height);
         tr_resize(&ptr, event.as.resize.width, event.as.resize.height);
         sr_resize(&sr, event.as.resize.width, event.as.resize.height);
       } break;
@@ -420,6 +429,7 @@ i32 main(i32 argc, char **argv) {
                      0.0);
     }
     sr_begin_frame(&sr);
+    tr_begin_frame(&str, editor.font_scale, 0, 0, 0, 0, 0.0);
     {
       u32 min_row, min_col, max_row, max_col;
       get_buffer_selection_bounds(&CURRENT_BUFFER(),
@@ -566,8 +576,8 @@ i32 main(i32 argc, char **argv) {
     }
 
     {
-      ptr.x_lower_limit = 0.0;
-      ptr.x_higher_limit = window->width;
+      str.x_lower_limit = 0.0;
+      str.x_higher_limit = window->width;
 
       f32 y = window->height - (editor.font_scale + BUFFER_PADDING);
 
@@ -583,7 +593,7 @@ i32 main(i32 argc, char **argv) {
       u32 len = swprintf((i32 *) buffer, ARRAY_LEN(buffer), L"%u:%u",
                          CURRENT_BUFFER().cursor_row + 1,
                          CURRENT_BUFFER().cursor_col + 1);
-      tr_draw_text(&ptr, buffer, len, BUFFER_PADDING, y + BUFFER_PADDING * 0.5);
+      tr_draw_text(&str, buffer, len, BUFFER_PADDING, y + BUFFER_PADDING * 0.5);
 
       char *file_path = CURRENT_FILE_PATH();
       if (!file_path)
@@ -594,11 +604,12 @@ i32 main(i32 argc, char **argv) {
       if (CURRENT_BUFFER().is_dirty)
         buffer[len++] = U'*';
       f32 x = window->width - tr_measure_text(&ptr, buffer, len) - BUFFER_PADDING;
-      tr_draw_text(&ptr, buffer, len, x, y + BUFFER_PADDING * 0.5);
+      tr_draw_text(&str, buffer, len, x, y + BUFFER_PADDING * 0.5);
     }
 
     tr_end_frame(&tr);
     sr_end_frame(&sr);
+    tr_end_frame(&str);
     tr_end_frame(&ptr);
     vik_end_frame(executor);
 
@@ -616,6 +627,7 @@ i32 main(i32 argc, char **argv) {
 
   sr_delete(&sr);
   tr_delete(&ptr);
+  tr_delete(&str);
   tr_delete(&tr);
   vik_delete_executor(executor);
   vik_delete_instance(instance);
