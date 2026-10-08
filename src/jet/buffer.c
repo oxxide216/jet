@@ -215,7 +215,7 @@ void buffer_move_right(Buffer *buffer, bool is_selecting) {
   }
 }
 
-// This is magic
+// This is black magic
 void buffer_move_down(Buffer *buffer, bool is_selecting, u32 max_visual_line_len) {
   if (!buffer->is_selecting && is_selecting) {
     buffer->anchor_row = buffer->cursor_row;
@@ -225,13 +225,13 @@ void buffer_move_down(Buffer *buffer, bool is_selecting, u32 max_visual_line_len
   buffer->is_selecting = is_selecting;
 
   Line *line = buffer->lines.items + buffer->cursor_row;
-  if (buffer->cursor_col + max_visual_line_len <= line->len + 1) {
+  if (buffer->cursor_col + max_visual_line_len < line->len) {
     u32 rem = buffer->cursor_col % max_visual_line_len;
     if (rem < ARRAY_LEN(LINE_WRAP_MARKER))
       buffer->cursor_col += max_visual_line_len - rem - 1;
     else
       buffer->cursor_col += max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
-  } else if (buffer->cursor_col + max_visual_line_len <=
+  } else if (buffer->cursor_col + max_visual_line_len + 1 <
              line->len + ARRAY_LEN(LINE_WRAP_MARKER)) {
     buffer->cursor_col += max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
   } else if (buffer->cursor_row + 1 < buffer->lines.len) {
@@ -252,7 +252,7 @@ void buffer_move_down(Buffer *buffer, bool is_selecting, u32 max_visual_line_len
   }
 }
 
-// This is magic too
+// This is black magic too
 void buffer_move_up(Buffer *buffer, bool is_selecting, u32 max_visual_line_len) {
   if (!buffer->is_selecting && is_selecting) {
     buffer->anchor_row = buffer->cursor_row;
@@ -267,23 +267,19 @@ void buffer_move_up(Buffer *buffer, bool is_selecting, u32 max_visual_line_len) 
     --buffer->cursor_row;
 
     Line *line = buffer->lines.items + buffer->cursor_row;
-    u32 new_col;
-    if (buffer->desired_col > line->len)
-      new_col = line->len;
-    else
-      new_col = buffer->desired_col;
 
-    buffer->cursor_col =
-      line->len -
-      line->len % max_visual_line_len +
-      new_col;
-    if (buffer->cursor_col >= max_visual_line_len) {
-      u32 rem = buffer->cursor_col % max_visual_line_len;
-      if (rem + 1 < ARRAY_LEN(LINE_WRAP_MARKER))
-        buffer->cursor_col -= rem + 1;
-      else
-        buffer->cursor_col -= ARRAY_LEN(LINE_WRAP_MARKER);
-    }
+    if (line->len >= max_visual_line_len)
+      buffer->cursor_col =
+        line->len -
+        (line->len - max_visual_line_len) %
+        (max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER)) -
+        1;
+    else
+      buffer->cursor_col = 0;
+    buffer->cursor_col += buffer->desired_col;
+
+    if (buffer->cursor_col > line->len)
+      buffer->cursor_col = line->len;
   }
 }
 
@@ -558,10 +554,21 @@ WideStr buffer_get_current_line(Buffer *buffer) {
 }
 
 WideStr buffer_get_next_line(Buffer *buffer) {
-  if (buffer->cursor_row == buffer->lines.len)
+  if (buffer->cursor_row + 1 == buffer->lines.len)
     return (WideStr) {0};
 
   Line *line = buffer->lines.items + buffer->cursor_row + 1;
+  return (WideStr) {
+    line->items,
+    line->len,
+  };
+}
+
+WideStr buffer_get_line(Buffer *buffer, u32 index) {
+  if (index >= buffer->lines.len)
+    return (WideStr) {0};
+
+  Line *line = buffer->lines.items + index;
   return (WideStr) {
     line->items,
     line->len,

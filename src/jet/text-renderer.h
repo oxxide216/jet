@@ -70,7 +70,6 @@ typedef struct {
   u32             sel_begin_col;
   u32             sel_end_row;
   u32             sel_end_col;
-  f32             scroll;
   f32             x_lower_limit;
   f32             x_higher_limit;
   u32             line_index;
@@ -89,8 +88,7 @@ TextRenderer tr_make(WinxWindow *window,
 void         tr_resize(TextRenderer *tr, f32 width, f32 height);
 void         tr_begin_frame(TextRenderer *tr, f32 scale,
                             u32 sel_begin_row, u32 sel_begin_col,
-                            u32 sel_end_row, u32 sel_end_col,
-                            f32 scroll);
+                            u32 sel_end_row, u32 sel_end_col);
 void         tr_set_bg_color(TextRenderer *tr, f32 r, f32 g, f32 b);
 void         tr_set_fg_color(TextRenderer *tr, f32 r, f32 g, f32 b);
 void         tr_set_sel_color(TextRenderer *tr, f32 r, f32 g, f32 b);

@@ -1,4 +1,3 @@
-// TODO: do not render invisible lines above the screen
 #include <wchar.h>
 
 #include "shl/shl-defs.h"
@@ -425,11 +424,10 @@ i32 main(i32 argc, char **argv) {
                                   &max_row, &max_col);
       tr_begin_frame(&ptr, editor.font_scale,
                      min_row, min_col,
-                     max_row, max_col,
-                     0.0);
+                     max_row, max_col);
     }
     sr_begin_frame(&sr);
-    tr_begin_frame(&str, editor.font_scale, 0, 0, 0, 0, 0.0);
+    tr_begin_frame(&str, editor.font_scale, 0, 0, 0, 0);
     {
       u32 min_row, min_col, max_row, max_col;
       get_buffer_selection_bounds(&CURRENT_BUFFER(),
@@ -437,33 +435,44 @@ i32 main(i32 argc, char **argv) {
                                   &max_row, &max_col);
       tr_begin_frame(&tr, editor.font_scale,
                      min_row, min_col,
-                     max_row, max_col,
-                     CURRENT_SCROLL());
+                     max_row, max_col);
     }
 
-    tr.x_lower_limit = 0.0;
-    tr.x_higher_limit = window->width;
+    // Rendering main buffer
+    {
+      tr.x_lower_limit = 0.0;
+      tr.x_higher_limit = window->width;
 
-    f32 y = BUFFER_PADDING;
-    for (u32 i = 0; i < CURRENT_BUFFER().lines.len; ++i) {
-      if (i >= CURRENT_BUFFER().cursor_row &&
-          CURRENT_SCROLL() > y - BUFFER_PADDING) {
-        CURRENT_SCROLL() = y - BUFFER_PADDING;
-      } else if (CURRENT_SCROLL() <
-                 y - (window->height - BUFFER_PADDING * 2.0 - editor.font_scale * 2.0)) {
-        if (i <= CURRENT_BUFFER().cursor_row)
-          CURRENT_SCROLL() =
-            y - (window->height - BUFFER_PADDING * 2.0 - editor.font_scale * 2.0);
-        else
+      if (CURRENT_SCROLL() > CURRENT_BUFFER().cursor_row)
+        CURRENT_SCROLL() = CURRENT_BUFFER().cursor_row;
+
+      tr.line_index = CURRENT_SCROLL();
+
+      u32 visible_lines = 0;
+      u32 offset = 0;
+
+      f32 y = BUFFER_PADDING - editor.additional_scroll;
+      for (u32 i = CURRENT_SCROLL(); i < CURRENT_BUFFER().lines.len; ++i) {
+        if (y >= window->height - editor.font_scale - BUFFER_PADDING * 3.0)
           break;
+
+        WideStr line = buffer_get_line(&CURRENT_BUFFER(), i);
+        f32 new_y = tr_draw_line(&tr, line.ptr, line.len,
+                                 BUFFER_PADDING, y,
+                                 window->width - BUFFER_PADDING * 2.0);
+        if (y >= window->height - editor.font_scale - BUFFER_PADDING * 3.0)
+          break;
+        offset += (u32) ((new_y - y) / editor.font_scale) - 1;
+        editor.additional_scroll = new_y - y - editor.font_scale;
+        y = new_y;
+        ++visible_lines;
       }
 
-      Line *line = CURRENT_BUFFER().lines.items + i;
-      y = tr_draw_line(&tr, line->items, line->len,
-                       BUFFER_PADDING, y,
-                       window->width - BUFFER_PADDING * 2.0);
+      if (CURRENT_SCROLL() + visible_lines < CURRENT_BUFFER().cursor_row + 1)
+        CURRENT_SCROLL() = CURRENT_BUFFER().cursor_row - visible_lines + 1;
     }
 
+    // Rendering command palette
     if (editor.mode == JetModeCommandPalette) {
       WideStr line = buffer_get_current_line(editor.current_buffer);
 
@@ -575,6 +584,7 @@ i32 main(i32 argc, char **argv) {
       }
     }
 
+    // Rendering status bar
     {
       str.x_lower_limit = 0.0;
       str.x_higher_limit = window->width;

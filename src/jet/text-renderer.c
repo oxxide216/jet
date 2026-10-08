@@ -75,8 +75,7 @@ void tr_resize(TextRenderer *tr, f32 width, f32 height) {
 
 void tr_begin_frame(TextRenderer *tr, f32 scale,
                     u32 sel_begin_row, u32 sel_begin_col,
-                    u32 sel_end_row, u32 sel_end_col,
-                    f32 scroll) {
+                    u32 sel_end_row, u32 sel_end_col) {
   tr->text_ssbo_data.len = 0;
   tr->sel_ssbo_data.len = 0;
   tr->is_glyphs_cache_dirty = false;
@@ -87,7 +86,6 @@ void tr_begin_frame(TextRenderer *tr, f32 scale,
   tr->sel_begin_col = sel_begin_col;
   tr->sel_end_row = sel_end_row;
   tr->sel_end_col = sel_end_col;
-  tr->scroll = scroll;
 
   tr->line_index = 0;
 }
@@ -230,7 +228,6 @@ f32 tr_measure_text(TextRenderer *tr, u32 *text, u32 text_len) {
 
 f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y, f32 x_limit) {
   f32 begin_x = x;
-  y -= tr->scroll;
 
   f32 sel_begin_x = x;
   f32 sel_end_x = x;
@@ -297,7 +294,7 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y, f32 x_
 
       tr_draw_text(tr, LINE_WRAP_MARKER,
                    ARRAY_LEN(LINE_WRAP_MARKER) - 1,
-                   begin_x, y + tr->scroll);
+                   begin_x, y);
 
       last_wrap_i = i;
     }
@@ -338,12 +335,10 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y, f32 x_
 
   ++tr->line_index;
 
-  return y + tr->scroll + tr->scale;
+  return y + tr->scale;
 }
 
 void tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
-  y -= tr->scroll;
-
   for (u32 i = 0; i < text_len; ++i) {
     TextSSBOEntry text_entry = {
       x, y,       // Modified by get_char_data

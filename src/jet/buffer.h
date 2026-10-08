@@ -48,5 +48,6 @@ void buffer_write_file(Buffer *buffer, char *path);
 WideStr buffer_get_prev_line(Buffer *buffer);
 WideStr buffer_get_current_line(Buffer *buffer);
 WideStr buffer_get_next_line(Buffer *buffer);
+WideStr buffer_get_line(Buffer *buffer, u32 index);
 
 #endif // BUFFER_H

@@ -6,7 +6,7 @@
 
 typedef struct {
   Buffer  buffer;
-  f32     scroll;
+  u32     scroll;
   char   *file_path;
 } MainBuffer;
 
@@ -22,6 +22,7 @@ struct Editor {
   Buffer       palette_buffer;
   Buffer      *current_buffer;
   u32          current_main_buffer_index;
+  f32          additional_scroll;
 
   Provider *provider;
   WideStrs  options;
