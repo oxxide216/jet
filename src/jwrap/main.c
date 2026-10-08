@@ -1,3 +1,5 @@
+// TODO: Debounce
+
 #include "shl/shl-defs.h"
 #include "shl/shl-log.h"
 #include "cns/cns.h"
@@ -12,6 +14,7 @@ static CnsResult connected(CnsCtx *ctx, CnsConnection *connection);
 static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *data, unsigned long data_len);
 static void      disconnected(CnsCtx *ctx, CnsConnection *connection);
 
+static char **global_argv;
 static const char *socket_path;
 static bool is_running = true;
 static CnsConnection *server_connection = NULL;
@@ -124,9 +127,15 @@ static CnsResult connected(CnsCtx *ctx, CnsConnection *connection) {
 static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *data, unsigned long data_len) {
   (void) ctx;
   (void) connection;
-  (void) data;
 
-  printf("[INFO] Received %lu bytes of data\n", data_len);
+  u32 len = data_len;
+  Message message;
+  while (len > 0 && decode_message(&message, &data, &len)) {
+    if (message.kind == MessageKindRerun) {
+      child = run_command_capturing_output(global_argv);
+      is_reading = true;
+    }
+  }
 
   return CnsResultOk;
 }
@@ -152,6 +161,8 @@ i32 main(i32 argc, char **argv) {
     return 1;
   }
 
+  global_argv = argv;
+
   CnsCtx *cns = cns_create();
 
   socket_path = get_first_jet_socket_path();
@@ -166,12 +177,12 @@ i32 main(i32 argc, char **argv) {
     exit(1);
   }
 
-  child = run_command_capturing_output(argv);
   Stream stream;
   stream.len = 0;
   stream.cap = 1024;
   stream.items = malloc(stream.cap * sizeof(*stream.items));
 
+  child = run_command_capturing_output(global_argv);
   is_reading = true;
 
   while (is_running) {
