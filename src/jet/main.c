@@ -27,19 +27,15 @@
 
 static u32 get_max_visual_line_len(WideStr line, WinxWindow *window, TextRenderer *tr) {
   f32 editor_width = window->width - BUFFER_PADDING * 2.0;
-  Da(u32) line_da = {
-    malloc(line.len * sizeof(*line.ptr)),
-    line.len,
-    line.len,
-  };
-  memcpy(line_da.items, line.ptr, line.len * sizeof(*line.ptr));
-  while (tr_measure_text(tr, line_da.items, line_da.len) < editor_width)
-    DA_APPEND(line_da, U' ');
-  while (line_da.len > 0 &&
-         tr_measure_text(tr, line_da.items, line_da.len) > editor_width)
-    --line_da.len;
-  free(line_da.items);
-  return line_da.len;
+  u32 space = U' ';
+  f32 space_width = tr_measure_text(tr, &space, 1);
+  u32 spaces = 0;
+  while (tr_measure_text(tr, line.ptr, line.len) + spaces * space_width < editor_width)
+    ++spaces;
+  while (line.len > 0 &&
+         tr_measure_text(tr, line.ptr, line.len) + spaces * space_width > editor_width)
+    --line.len;
+  return line.len + spaces;
 }
 
 static void get_buffer_selection_bounds(Buffer *buffer,
