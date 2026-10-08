@@ -1,20 +1,22 @@
 #include <wchar.h>
 
 #include "shl/shl-defs.h"
+#include "shl/shl-str.h"
+#include "shl/shl-log.h"
 #include "viking/viking.h"
 #include "winx/event.h"
+#include "cns/cns.h"
 #include "../../build/assets.c"
 #include "text-renderer.h"
 #include "shape-renderer.h"
 #include "editor.h"
 #include "buffer.h"
 #include "provider.h"
+#include "platform.h"
 // Customize your editor here!
 #include "config.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
-#define SHL_STR_IMPLEMENTATION
-#include "shl/shl-str.h"
 
 #define CURRENT_BUFFER()                                             \
   editor.main_buffers.items[editor.current_main_buffer_index].buffer
@@ -62,6 +64,29 @@ static void get_buffer_selection_bounds(Buffer *buffer,
     *max_row = buffer->cursor_row;
     *max_col = buffer->cursor_col + 1;
   }
+}
+
+static CnsResult connected(CnsCtx *ctx, CnsConnection *connection) {
+  (void) ctx;
+  (void) connection;
+
+  return CnsResultOk;
+}
+
+static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *data, unsigned long data_len) {
+  (void) ctx;
+  (void) connection;
+  (void) data;
+  (void) data_len;
+
+  puts("Data! Yay!");
+
+  return CnsResultOk;
+}
+
+static void disconnected(CnsCtx *ctx, CnsConnection *connection) {
+  (void) ctx;
+  (void) connection;
 }
 
 i32 main(i32 argc, char **argv) {
@@ -139,6 +164,25 @@ i32 main(i32 argc, char **argv) {
   tr_set_sel_color(&tr, ACC_COLOR);
 
   tr_set_sel_color(&ptr, ACC_COLOR);
+
+  // Network initialization for jwrap integration
+  CnsCtx *cns = cns_create();
+
+  char socket_path[512];
+  snprintf(socket_path, sizeof(socket_path), "%s%u",
+           get_socket_path_prefix(), get_process_id());
+
+  CnsListenInfo listen_info = {
+    .proto = CnsProtoUnix,
+    .receive_timeout = 15,
+    .connected_cb = connected,
+    .data_cb = data,
+    .disconnected_cb = disconnected,
+  };
+  CnsError cns_error = cns_unix_listen(cns, socket_path, &listen_info);
+  bool is_server_active = cns_error == CnsErrorOk;
+  if (!is_server_active)
+    WARN("Failed to create server: %s\n", cns_get_error_str(cns_error));
 
   while (is_running) {
     WinxEvent event;
@@ -410,6 +454,8 @@ i32 main(i32 argc, char **argv) {
       }
     }
 
+    cns_step(cns, 1);
+
     if (!vik_begin_frame(executor, BG_COLOR, 1.0)) {
       winx_draw(window);
       continue;
@@ -625,6 +671,8 @@ i32 main(i32 argc, char **argv) {
 
     winx_draw(window);
   }
+
+  cns_destroy(cns);
 
   buffer_delete(&editor.palette_buffer);
   for (u32 i = 0; i < editor.main_buffers.len; ++i) {

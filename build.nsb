@@ -1,15 +1,21 @@
-cflags = -Wall -Wextra -Ilibs/viking/include -Ilibs/viking/libs -Ilibs/viking/libs/winx/include -ggdb
+cflags = -Wall -Wextra -Ilibs/viking/include -Ilibs/viking/libs -Ilibs/viking/libs/winx/include -Ilibs/cns/include -ggdb
 ldflags = -lX11 -lXext -lXrandr -lXfixes -lGLX -lvulkan -lm
 build_dir = build
 shader_spvs = $build_dir/shaders/text.vert.spv $build_dir/shaders/text.frag.spv $build_dir/shaders/sel.vert.spv $build_dir/shaders/sel.frag.spv $build_dir/shaders/shape.vert.spv $build_dir/shaders/shape.frag.spv $build_dir/shaders/circle.vert.spv $build_dir/shaders/circle.frag.spv
 fonts = fonts/MonaspaceNeon-Regular.otf
 
 [jet]
-src = src/jet/**.c
-deps = viking winx
+src = src/jet/**.c src/common/**.c
+deps = viking winx cns
 ghost_deps = $build_dir/assets.c
 cflags = $cflags
 ldflags = $ldflags
+incpath = $build_dir
+
+[jwrap]
+src = src/jwrap/**.c src/common/**.c
+deps = cns
+cflags = $cflags
 incpath = $build_dir
 
 [$build_dir/assets.c]
@@ -74,3 +80,9 @@ type = custom
 name_type = static_lib
 cmd = make CFLAGS=-DWINX_VULKAN -C libs/viking/libs/winx -B && cp libs/viking/libs/winx/libwinx.* .
 src = libs/viking/libs/winx/src/**.c
+
+[cns]
+type = custom
+name_type = static_lib
+cmd = cp libs/cns/build-unix.nsb libs/cns/build.nsb && ./nsb libs/cns && cp libs/cns/libcns.* .
+src = libs/cns/src/**.c

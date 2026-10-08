@@ -3,3 +3,5 @@
 /lib*
 !/libs/
 /jet
+/jwrap
+/test.c
