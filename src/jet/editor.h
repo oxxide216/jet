@@ -8,6 +8,7 @@ typedef struct {
   Buffer  buffer;
   u32     scroll;
   char   *file_path;
+  Str     abs_file_path;
 } MainBuffer;
 
 typedef Da(MainBuffer) MainBuffers;
@@ -22,7 +23,6 @@ struct Editor {
   Buffer       palette_buffer;
   Buffer      *current_buffer;
   u32          current_main_buffer_index;
-  f32          additional_scroll;
 
   Provider *provider;
   WideStrs  options;
@@ -33,6 +33,8 @@ struct Editor {
   JetMode mode;
 
   f32 font_scale;
+
+  bool is_jwrap_connected;
 };
 
 MainBuffer main_buffer_make(char *path);

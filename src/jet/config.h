@@ -21,8 +21,13 @@
 
 #define SHADOW_COLOR 0.0, 0.0, 0.0, 0.5
 
-#define BG_COLOR  0x18/255.0, 0x18/255.0, 0x18/255.0
-#define FG_COLOR  0x86/255.0, 0x8a/255.0, 0xac/255.0
-#define ACC_COLOR 0x82/255.0, 0x53/255.0, 0xa1/255.0
+#define BG_COLOR     0x18/255.0, 0x18/255.0, 0x18/255.0
+#define FG_COLOR     0x86/255.0, 0x8a/255.0, 0xac/255.0
+#define ACC_COLOR    0x82/255.0, 0x53/255.0, 0xa1/255.0
+#define ALT_BG_COLOR 0x6a/255.0, 0x7c/255.0, 0x93/255.0
+#define ALT_FG_COLOR 0x18/255.0, 0x18/255.0, 0x18/255.0
+#define ERROR_COLOR  0xb5/255.0, 0x40/255.0, 0x36/255.0
+#define WARN_COLOR   0xde/255.0, 0xb5/255.0, 0x66/255.0
+#define INFO_COLOR   0x5a/255.0, 0xb9/255.0, 0x77/255.0
 
 #endif // CONFIG_H

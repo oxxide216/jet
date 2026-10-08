@@ -120,6 +120,6 @@ Str get_current_dir(void) {
   Str result;
   result.len = strlen(buffer);
   result.ptr = malloc(result.len * sizeof(*result.ptr));
-  memcpy(result.ptr, buffer, result.len);
+  memcpy(result.ptr, buffer, result.len * sizeof(*result.ptr));
   return result;
 }

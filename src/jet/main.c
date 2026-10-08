@@ -18,7 +18,7 @@
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
 
-#define CURRENT_BUFFER()                                             \
+#define CURRENT_BUFFER()                                              \
   editor.main_buffers.items[editor.current_main_buffer_index].buffer
 
 #define CURRENT_SCROLL()                                              \
@@ -26,6 +26,9 @@
 
 #define CURRENT_FILE_PATH()                                             \
   editor.main_buffers.items[editor.current_main_buffer_index].file_path
+
+#define CURRENT_ABS_FILE_PATH()                                         \
+  editor.main_buffers.items[editor.current_main_buffer_index].abs_file_path
 
 static u32 get_max_visual_line_len(WideStr line, WinxWindow *window, TextRenderer *tr) {
   f32 editor_width = window->width - BUFFER_PADDING * 2.0;
@@ -67,8 +70,10 @@ static void get_buffer_selection_bounds(Buffer *buffer,
 }
 
 static CnsResult connected(CnsCtx *ctx, CnsConnection *connection) {
-  (void) ctx;
   (void) connection;
+
+  Editor *editor = cns_get_user_data(ctx);
+  editor->is_jwrap_connected = true;
 
   return CnsResultOk;
 }
@@ -85,8 +90,10 @@ static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *dat
 }
 
 static void disconnected(CnsCtx *ctx, CnsConnection *connection) {
-  (void) ctx;
   (void) connection;
+
+  Editor *editor = cns_get_user_data(ctx);
+  editor->is_jwrap_connected = false;
 }
 
 i32 main(i32 argc, char **argv) {
@@ -167,6 +174,7 @@ i32 main(i32 argc, char **argv) {
 
   // Network initialization for jwrap integration
   CnsCtx *cns = cns_create();
+  cns_set_user_data(cns, &editor);
 
   char socket_path[512];
   snprintf(socket_path, sizeof(socket_path), "%s%u",
@@ -415,6 +423,8 @@ i32 main(i32 argc, char **argv) {
             buffer_delete(&CURRENT_BUFFER());
             if (CURRENT_FILE_PATH())
               free(CURRENT_FILE_PATH());
+            if (CURRENT_ABS_FILE_PATH().ptr)
+              free(CURRENT_ABS_FILE_PATH().ptr);
             DA_REMOVE_AT(editor.main_buffers, editor.current_main_buffer_index);
             if (editor.main_buffers.len == 0) {
               MainBuffer main_buffer = main_buffer_make(NULL);
@@ -492,21 +502,15 @@ i32 main(i32 argc, char **argv) {
       tr.line_index = CURRENT_SCROLL();
 
       u32 visible_lines = 0;
-      u32 offset = 0;
 
-      f32 y = BUFFER_PADDING - editor.additional_scroll;
+      f32 y = BUFFER_PADDING;
       for (u32 i = CURRENT_SCROLL(); i < CURRENT_BUFFER().lines.len; ++i) {
-        if (y >= window->height - editor.font_scale - BUFFER_PADDING * 3.0)
-          break;
-
         WideStr line = buffer_get_line(&CURRENT_BUFFER(), i);
         f32 new_y = tr_draw_line(&tr, line.ptr, line.len,
                                  BUFFER_PADDING, y,
                                  window->width - BUFFER_PADDING * 2.0);
-        if (y >= window->height - editor.font_scale - BUFFER_PADDING * 3.0)
+        if (new_y >= window->height - editor.font_scale - BUFFER_PADDING * 3.0)
           break;
-        offset += (u32) ((new_y - y) / editor.font_scale) - 1;
-        editor.additional_scroll = new_y - y - editor.font_scale;
         y = new_y;
         ++visible_lines;
       }
@@ -632,8 +636,8 @@ i32 main(i32 argc, char **argv) {
       str.x_lower_limit = 0.0;
       str.x_higher_limit = window->width;
 
-      tr_set_bg_color(&str, FG_COLOR);
-      tr_set_fg_color(&str, BG_COLOR);
+      tr_set_bg_color(&str, ALT_BG_COLOR);
+      tr_set_fg_color(&str, ALT_FG_COLOR);
 
       f32 y = window->height - (editor.font_scale + BUFFER_PADDING);
 
@@ -642,14 +646,57 @@ i32 main(i32 argc, char **argv) {
                    y,
                    window->width,
                    editor.font_scale + BUFFER_PADDING,
-                   FG_COLOR, 1.0);
+                   ALT_BG_COLOR, 1.0);
+
+      y += BUFFER_PADDING * 0.5;
 
       u32 buffer[512];
       static_assert(sizeof(u32) == sizeof(wchar_t));
       u32 len = swprintf((i32 *) buffer, ARRAY_LEN(buffer), L"%u:%u",
                          CURRENT_BUFFER().cursor_row + 1,
                          CURRENT_BUFFER().cursor_col + 1);
-      tr_draw_text(&str, buffer, len, BUFFER_PADDING, y + BUFFER_PADDING * 0.5);
+      tr_draw_text(&str, buffer, len, BUFFER_PADDING, y);
+
+      len = 0;
+      if (editor.is_jwrap_connected) {
+        buffer[len++] = U'✔';
+        buffer[len++] = U' ';
+      }
+      u32 len0 = len;
+      static_assert(sizeof(u32) == sizeof(wchar_t));
+      // TODO: actual errors count
+      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len, L"%u", 0);
+      u32 len1 = len;
+      buffer[len++] = U':';
+      u32 len2 = len;
+      static_assert(sizeof(u32) == sizeof(wchar_t));
+      // TODO: actual warnings count
+      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len, L"%u", 0);
+      u32 len3 = len;
+      buffer[len++] = U':';
+      u32 len4 = len;
+      static_assert(sizeof(u32) == sizeof(wchar_t));
+      // TODO: actual infos count
+      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len, L"%u", 0);
+      u32 len5 = len;
+
+      f32 x = (window->width - tr_measure_text(&str, buffer, len)) * 0.5 - BUFFER_PADDING;
+      tr_draw_text(&str, buffer, len0, x, y);
+      tr_set_fg_color(&str, ERROR_COLOR);
+      x += tr_measure_text(&str, buffer, len0);
+      tr_draw_text(&str, buffer + len0, len1 - len0, x, y);
+      tr_set_fg_color(&str, ALT_FG_COLOR);
+      x += tr_measure_text(&str, buffer + len0, len2 - len1);
+      tr_draw_text(&str, buffer + len1, len2 - len1, x, y);
+      tr_set_fg_color(&str, WARN_COLOR);
+      x += tr_measure_text(&str, buffer + len0, len3 - len2);
+      tr_draw_text(&str, buffer + len2, len3 - len2, x, y);
+      tr_set_fg_color(&str, ALT_FG_COLOR);
+      x += tr_measure_text(&str, buffer + len0, len4 - len3);
+      tr_draw_text(&str, buffer + len3, len4 - len3, x, y);
+      tr_set_fg_color(&str, INFO_COLOR);
+      x += tr_measure_text(&str, buffer + len0, len5 - len4);
+      tr_draw_text(&str, buffer + len4, len5 - len4, x, y);
 
       char *file_path = CURRENT_FILE_PATH();
       if (!file_path)
@@ -659,8 +706,9 @@ i32 main(i32 argc, char **argv) {
         buffer[len++] = *file_path++;
       if (CURRENT_BUFFER().is_dirty)
         buffer[len++] = U'*';
-      f32 x = window->width - tr_measure_text(&ptr, buffer, len) - BUFFER_PADDING;
-      tr_draw_text(&str, buffer, len, x, y + BUFFER_PADDING * 0.5);
+      tr_set_fg_color(&str, ALT_FG_COLOR);
+      x = window->width - tr_measure_text(&str, buffer, len) - BUFFER_PADDING;
+      tr_draw_text(&str, buffer, len, x, y);
     }
 
     tr_end_frame(&tr);

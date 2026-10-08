@@ -125,7 +125,7 @@ static CnsResult connected(CnsCtx *ctx, CnsConnection *connection) {
 
   server_connection = connection;
 
-  printf("[INFO] Connected to server\n");
+  INFO("Connected to server\n");
 
   return CnsResultOk;
 }
@@ -150,7 +150,7 @@ static void disconnected(CnsCtx *ctx, CnsConnection *connection) {
   (void) ctx;
   (void) connection;
 
-  printf("[INFO] Disconnected from server, shutting down\n");
+  INFO("Disconnected from server, shutting down\n");
 
   is_running = false;
 }
