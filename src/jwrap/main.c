@@ -187,13 +187,17 @@ i32 main(i32 argc, char **argv) {
   stream.len = 0;
   stream.cap = 1024;
   stream.items = malloc(stream.cap * sizeof(*stream.items));
+  u32 stream_cursor = 0;
 
   child = run_command_capturing_output(global_argv);
   is_reading = true;
 
   while (is_running) {
-    if (is_reading)
+    if (is_reading) {
       is_reading = child_read(&child, &stream);
+      printf("%.*s", (i32) (stream.len - stream_cursor), stream.items + stream_cursor);
+      stream_cursor = stream.len;
+    }
 
     if (server_connection) {
       parse_entries(&entries, &stream);
