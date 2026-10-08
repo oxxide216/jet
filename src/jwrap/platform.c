@@ -113,3 +113,13 @@ bool child_read(Child *child, Stream *output) {
 void child_wait(Child *child) {
   waitpid(child->pid, NULL, 0);
 }
+
+Str get_current_dir(void) {
+  char buffer[PATH_MAX];
+  getcwd(buffer, sizeof(buffer));
+  Str result;
+  result.len = strlen(buffer);
+  result.ptr = malloc(result.len * sizeof(*result.ptr));
+  memcpy(result.ptr, buffer, result.len);
+  return result;
+}

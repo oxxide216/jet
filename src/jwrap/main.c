@@ -42,6 +42,8 @@ static bool str_begins_with(Str str, Str prefix) {
 }
 
 static void parse_entries(MessageEntries *entries, Stream *stream) {
+  Str cwd = get_current_dir();
+
   u32 cursor = 0;
   while (cursor < stream->len) {
     u32 anchor = cursor;
@@ -54,8 +56,10 @@ static void parse_entries(MessageEntries *entries, Stream *stream) {
       break;
 
     Str file_path = { NULL, cursor - anchor };
-    file_path.ptr = malloc(file_path.len * sizeof(*file_path.ptr));
-    memcpy(file_path.ptr, stream->items + anchor, file_path.len);
+    file_path.ptr = malloc((cwd.len + 1 + file_path.len) * sizeof(*file_path.ptr));
+    memcpy(file_path.ptr, cwd.ptr, cwd.len);
+    file_path.ptr[cwd.len] = '/';
+    memcpy(file_path.ptr + cwd.len + 1, stream->items + anchor, file_path.len);
 
     anchor = cursor;
     while (cursor < stream->len &&
@@ -112,6 +116,8 @@ static void parse_entries(MessageEntries *entries, Stream *stream) {
 
   memmove(stream->items, stream->items + cursor, stream->len - cursor);
   stream->len -= cursor;
+
+  free(cwd.ptr);
 }
 
 static CnsResult connected(CnsCtx *ctx, CnsConnection *connection) {
