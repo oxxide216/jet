@@ -668,46 +668,51 @@ i32 main(i32 argc, char **argv) {
                          CURRENT_BUFFER().cursor_col + 1);
       tr_draw_text(&str, buffer, len, BUFFER_PADDING, y);
 
-      len = 0;
-      if (editor.is_jwrap_connected) {
-        buffer[len++] = U'✔';
-        buffer[len++] = U' ';
-      }
-      u32 len0 = len;
-      static_assert(sizeof(u32) == sizeof(wchar_t));
-      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len,
-                      L"%u", editor.errors.len);
-      u32 len1 = len;
-      buffer[len++] = U':';
-      u32 len2 = len;
-      static_assert(sizeof(u32) == sizeof(wchar_t));
-      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len,
-                      L"%u", editor.warnings.len);
-      u32 len3 = len;
-      buffer[len++] = U':';
-      u32 len4 = len;
-      static_assert(sizeof(u32) == sizeof(wchar_t));
-      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len,
-                      L"%u", editor.infos.len);
-      u32 len5 = len;
+      if (editor.is_jwrap_connected ||
+         editor.errors.len > 0 ||
+         editor.warnings.len > 0 ||
+         editor.infos.len > 0) {
+        len = 0;
+        if (editor.is_jwrap_connected) {
+          buffer[len++] = U'✔';
+          buffer[len++] = U' ';
+        }
+        u32 len0 = len;
+        static_assert(sizeof(u32) == sizeof(wchar_t));
+        len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len,
+                        L"%u", editor.errors.len);
+        u32 len1 = len;
+        buffer[len++] = U':';
+        u32 len2 = len;
+        static_assert(sizeof(u32) == sizeof(wchar_t));
+        len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len,
+                        L"%u", editor.warnings.len);
+        u32 len3 = len;
+        buffer[len++] = U':';
+        u32 len4 = len;
+        static_assert(sizeof(u32) == sizeof(wchar_t));
+        len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len,
+                        L"%u", editor.infos.len);
+        u32 len5 = len;
 
-      f32 x = (window->width - tr_measure_text(&str, buffer, len)) * 0.5 - BUFFER_PADDING;
-      tr_draw_text(&str, buffer, len0, x, y);
-      tr_set_fg_color(&str, ERROR_COLOR);
-      x += tr_measure_text(&str, buffer, len0);
-      tr_draw_text(&str, buffer + len0, len1 - len0, x, y);
-      tr_set_fg_color(&str, ALT_FG_COLOR);
-      x += tr_measure_text(&str, buffer + len0, len2 - len1);
-      tr_draw_text(&str, buffer + len1, len2 - len1, x, y);
-      tr_set_fg_color(&str, WARN_COLOR);
-      x += tr_measure_text(&str, buffer + len0, len3 - len2);
-      tr_draw_text(&str, buffer + len2, len3 - len2, x, y);
-      tr_set_fg_color(&str, ALT_FG_COLOR);
-      x += tr_measure_text(&str, buffer + len0, len4 - len3);
-      tr_draw_text(&str, buffer + len3, len4 - len3, x, y);
-      tr_set_fg_color(&str, INFO_COLOR);
-      x += tr_measure_text(&str, buffer + len0, len5 - len4);
-      tr_draw_text(&str, buffer + len4, len5 - len4, x, y);
+        f32 x = (window->width - tr_measure_text(&str, buffer, len)) * 0.5 - BUFFER_PADDING;
+        tr_draw_text(&str, buffer, len0, x, y);
+        tr_set_fg_color(&str, ERROR_COLOR);
+        x += tr_measure_text(&str, buffer, len0);
+        tr_draw_text(&str, buffer + len0, len1 - len0, x, y);
+        tr_set_fg_color(&str, ALT_FG_COLOR);
+        x += tr_measure_text(&str, buffer + len0, len2 - len1);
+        tr_draw_text(&str, buffer + len1, len2 - len1, x, y);
+        tr_set_fg_color(&str, WARN_COLOR);
+        x += tr_measure_text(&str, buffer + len0, len3 - len2);
+        tr_draw_text(&str, buffer + len2, len3 - len2, x, y);
+        tr_set_fg_color(&str, ALT_FG_COLOR);
+        x += tr_measure_text(&str, buffer + len0, len4 - len3);
+        tr_draw_text(&str, buffer + len3, len4 - len3, x, y);
+        tr_set_fg_color(&str, INFO_COLOR);
+        x += tr_measure_text(&str, buffer + len0, len5 - len4);
+        tr_draw_text(&str, buffer + len4, len5 - len4, x, y);
+      }
 
       char *file_path = CURRENT_FILE_PATH();
       if (!file_path)
@@ -718,7 +723,7 @@ i32 main(i32 argc, char **argv) {
       if (CURRENT_BUFFER().is_dirty)
         buffer[len++] = U'*';
       tr_set_fg_color(&str, ALT_FG_COLOR);
-      x = window->width - tr_measure_text(&str, buffer, len) - BUFFER_PADDING;
+      f32 x = window->width - tr_measure_text(&str, buffer, len) - BUFFER_PADDING;
       tr_draw_text(&str, buffer, len, x, y);
     }
 
