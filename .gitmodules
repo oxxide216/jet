@@ -1,3 +1,6 @@
 [submodule "libs/viking"]
 	path = libs/viking
 	url = https://github.com/oxxide216/viking
+[submodule "libs/cns"]
+	path = libs/cns
+	url = https://github.com/oxxide216/cns

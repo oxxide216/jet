@@ -1,4 +1,5 @@
 /nsb
 /bundler
 /lib*
+!/libs/
 /jet
