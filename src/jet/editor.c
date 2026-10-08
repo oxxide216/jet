@@ -15,3 +15,21 @@ MainBuffer main_buffer_make(char *path) {
   }
   return (MainBuffer) { buffer_make(), 0.0, path, abs_path };
 }
+
+void editor_clear_entries(Editor *editor) {
+  MessageEntries *ptrs[] = {
+    &editor->errors,
+    &editor->warnings,
+    &editor->infos,
+  };
+
+  for (u32 i = 0; i < ARRAY_LEN(ptrs); ++i) {
+    for (u32 j = 0; j < ptrs[i]->len; ++j) {
+      free(ptrs[i]->items[j].file_path.ptr);
+      free(ptrs[i]->items[j].message.ptr);
+    }
+    if (ptrs[i]->items)
+      free(ptrs[i]->items);
+    ptrs[i]->len = 0;
+  }
+}

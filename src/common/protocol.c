@@ -17,6 +17,8 @@ bool decode_message(Message *message, u8 **buffer, u32 *len) {
 
     if (*len < message->as.entry.file_path.len)
       return false;
+    message->as.entry.file_path.ptr =
+      malloc(message->as.entry.file_path.len * sizeof(*message->as.entry.file_path.ptr));
     memcpy(message->as.entry.file_path.ptr, *buffer, message->as.entry.file_path.len);
     *len += message->as.entry.file_path.len;
     *buffer += message->as.entry.file_path.len;
@@ -47,6 +49,8 @@ bool decode_message(Message *message, u8 **buffer, u32 *len) {
 
     if (*len < message->as.entry.message.len)
       return false;
+    message->as.entry.message.ptr =
+      malloc(message->as.entry.message.len * sizeof(*message->as.entry.message.ptr));
     memcpy(message->as.entry.message.ptr, *buffer, message->as.entry.message.len);
     *len += message->as.entry.message.len;
     *buffer += message->as.entry.message.len;
@@ -58,7 +62,7 @@ bool decode_message(Message *message, u8 **buffer, u32 *len) {
   return true;
 }
 
-void encode_message(Buffer *buffer, Message *message) {
+void encode_message(ByteBuffer *buffer, Message *message) {
   DA_APPEND(*buffer, (u8) message->kind);
 
   switch (message->kind) {

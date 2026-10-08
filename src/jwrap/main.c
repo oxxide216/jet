@@ -8,8 +8,6 @@
 #define SHL_STR_IMPLEMENTATION
 #include "shl/shl-str.h"
 
-typedef Da(MessageEntry) MessageEntries;
-
 static CnsResult connected(CnsCtx *ctx, CnsConnection *connection);
 static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *data, unsigned long data_len);
 static void      disconnected(CnsCtx *ctx, CnsConnection *connection);
@@ -46,72 +44,107 @@ static void parse_entries(MessageEntries *entries, Stream *stream) {
 
   u32 cursor = 0;
   while (cursor < stream->len) {
-    u32 anchor = cursor;
-    while (cursor < stream->len &&
-           stream->items[cursor] != '\n' &&
-           stream->items[cursor] != ':')
+    while (cursor < stream->len) {
+      u32 anchor = cursor;
+      while (cursor < stream->len &&
+             stream->items[cursor] != '\n' &&
+             stream->items[cursor] != ':')
+        ++cursor;
+
+      if (cursor == stream->len || stream->items[cursor] != ':')
+        break;
+
+      Str file_path = { NULL, cursor - anchor };
+      file_path.ptr = malloc((cwd.len + 1 + file_path.len) * sizeof(*file_path.ptr));
+      memcpy(file_path.ptr, cwd.ptr, cwd.len);
+      file_path.ptr[cwd.len] = '/';
+      memcpy(file_path.ptr + cwd.len + 1, stream->items + anchor, file_path.len);
+      file_path.len += cwd.len + 1;
+
       ++cursor;
 
-    if (cursor == stream->len || stream->items[cursor] != ':')
-      break;
+      anchor = cursor;
+      while (cursor < stream->len &&
+             stream->items[cursor] != '\n' &&
+             stream->items[cursor] != ':')
+        ++cursor;
 
-    Str file_path = { NULL, cursor - anchor };
-    file_path.ptr = malloc((cwd.len + 1 + file_path.len) * sizeof(*file_path.ptr));
-    memcpy(file_path.ptr, cwd.ptr, cwd.len);
-    file_path.ptr[cwd.len] = '/';
-    memcpy(file_path.ptr + cwd.len + 1, stream->items + anchor, file_path.len);
+      if (cursor == stream->len || stream->items[cursor] != ':') {
+        free(file_path.ptr);
+        break;
+      }
 
-    anchor = cursor;
-    while (cursor < stream->len &&
-           stream->items[cursor] != '\n' &&
-           stream->items[cursor] != ':')
+      Str row_str = { stream->items + anchor, cursor - anchor };
+      u32 row = str_to_u32(row_str);
+      if (row == 0) {
+        free(file_path.ptr);
+        break;
+      }
+
       ++cursor;
 
-    if (cursor == stream->len || stream->items[cursor] != ':')
-      break;
+      anchor = cursor;
+      while (cursor < stream->len &&
+             stream->items[cursor] != '\n' &&
+             stream->items[cursor] != ':')
+        ++cursor;
 
-    Str row_str = { stream->items + anchor, cursor - anchor };
-    u32 row = str_to_u32(row_str);
+      if (cursor == stream->len || stream->items[cursor] != ':') {
+        free(file_path.ptr);
+        break;
+      }
 
-    anchor = cursor;
-    while (cursor < stream->len &&
-           stream->items[cursor] != '\n' &&
-           stream->items[cursor] != ':')
+      Str col_str = { stream->items + anchor, cursor - anchor };
+      u32 col = str_to_u32(col_str);
+      if (col == 0) {
+        free(file_path.ptr);
+        break;
+      }
+
       ++cursor;
+      if (cursor < stream->len)
+        ++cursor;
 
-    if (cursor == stream->len || stream->items[cursor] != ':')
-      break;
+      anchor = cursor;
+      while (cursor < stream->len &&
+             stream->items[cursor] != '\n')
+        ++cursor;
 
-    Str col_str = { stream->items + anchor, cursor - anchor };
-    u32 col = str_to_u32(col_str);
+      if (cursor == anchor) {
+        free(file_path.ptr);
+        break;
+      }
 
-    anchor = cursor;
+      Str message = { stream->items + anchor, cursor - anchor };
+
+      EntryKind kind;
+      if (str_begins_with(message, STR_LIT("error: "))) {
+        kind = EntryKindError;
+        anchor += STR_LIT("error: ").len;
+      } else if (str_begins_with(message, STR_LIT("warning: "))) {
+        kind = EntryKindWarn;
+        anchor += STR_LIT("warning: ").len;
+      } else if (str_begins_with(message, STR_LIT("note: "))) {
+        kind = EntryKindInfo;
+        anchor += STR_LIT("note: ").len;
+      } else {
+        free(file_path.ptr);
+        break;
+      }
+
+      message.ptr = malloc(message.len * sizeof(*message.ptr));
+      memcpy(message.ptr, stream->items + anchor, message.len);
+
+      MessageEntry entry = { file_path, row, col, message, kind };
+      DA_APPEND(*entries, entry);
+    }
+
     while (cursor < stream->len &&
            stream->items[cursor] != '\n')
       ++cursor;
 
-    if (cursor == anchor)
-      break;
-
-    Str message = { stream->items + anchor, cursor - anchor };
-
-    EntryKind kind;
-    if (str_begins_with(message, STR_LIT("error: "))) {
-      kind = EntryKindError;
-      anchor += STR_LIT("error: ").len;
-    } else if (str_begins_with(message, STR_LIT("warning: "))) {
-      kind = EntryKindWarn;
-      anchor += STR_LIT("warning: ").len;
-    } else if (str_begins_with(message, STR_LIT("note: "))) {
-      kind = EntryKindInfo;
-      anchor += STR_LIT("note: ").len;
-    }
-
-    message.ptr = malloc(message.len * sizeof(*message.ptr));
-    memcpy(message.ptr, stream->items + anchor, message.len);
-
-    MessageEntry entry = { file_path, row, col, message, kind };
-    DA_APPEND(*entries, entry);
+    if (cursor < stream->len)
+      ++cursor;
   }
 
   memmove(stream->items, stream->items + cursor, stream->len - cursor);
@@ -201,7 +234,7 @@ i32 main(i32 argc, char **argv) {
 
     if (server_connection) {
       parse_entries(&entries, &stream);
-      Buffer buffer = {0};
+      ByteBuffer buffer = {0};
 
       for (u32 i = 0; i < entries.len; ++i) {
         Message message = { MessageKindEntry, { entries.items[i] } };

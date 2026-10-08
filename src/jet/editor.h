@@ -3,6 +3,7 @@
 
 #include "buffer.h"
 #include "provider.h"
+#include "../common/protocol.h"
 
 typedef struct {
   Buffer  buffer;
@@ -34,9 +35,13 @@ struct Editor {
 
   f32 font_scale;
 
-  bool is_jwrap_connected;
+  bool           is_jwrap_connected;
+  MessageEntries errors;
+  MessageEntries warnings;
+  MessageEntries infos;
 };
 
 MainBuffer main_buffer_make(char *path);
+void       editor_clear_entries(Editor *editor);
 
 #endif // EDITOR_H

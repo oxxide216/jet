@@ -22,6 +22,8 @@ typedef struct {
   EntryKind kind;
 } MessageEntry;
 
+typedef Da(MessageEntry) MessageEntries;
+
 typedef struct {
   MessageKind kind;
   union {
@@ -29,9 +31,9 @@ typedef struct {
   } as;
 } Message;
 
-typedef Da(u8) Buffer;
+typedef Da(u8) ByteBuffer;
 
 bool decode_message(Message *message, u8 **buffer, u32 *len);
-void encode_message(Buffer *buffer, Message *message);
+void encode_message(ByteBuffer *buffer, Message *message);
 
 #endif // PROTOCOL_H

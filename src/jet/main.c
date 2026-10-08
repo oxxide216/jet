@@ -81,10 +81,21 @@ static CnsResult connected(CnsCtx *ctx, CnsConnection *connection) {
 static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *data, unsigned long data_len) {
   (void) ctx;
   (void) connection;
-  (void) data;
-  (void) data_len;
 
-  puts("Data! Yay!");
+  Editor *editor = cns_get_user_data(ctx);
+  editor_clear_entries(editor);
+
+  u32 len = data_len;
+  Message message;
+  while (len > 0 && decode_message(&message, &data, &len)) {
+    if (message.kind == MessageKindEntry) {
+      switch (message.as.entry.kind) {
+      case EntryKindError: DA_APPEND(editor->errors,   message.as.entry); break;
+      case EntryKindWarn:  DA_APPEND(editor->warnings, message.as.entry); break;
+      case EntryKindInfo:  DA_APPEND(editor->infos,    message.as.entry); break;
+      }
+    }
+  }
 
   return CnsResultOk;
 }
@@ -664,20 +675,20 @@ i32 main(i32 argc, char **argv) {
       }
       u32 len0 = len;
       static_assert(sizeof(u32) == sizeof(wchar_t));
-      // TODO: actual errors count
-      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len, L"%u", 0);
+      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len,
+                      L"%u", editor.errors.len);
       u32 len1 = len;
       buffer[len++] = U':';
       u32 len2 = len;
       static_assert(sizeof(u32) == sizeof(wchar_t));
-      // TODO: actual warnings count
-      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len, L"%u", 0);
+      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len,
+                      L"%u", editor.warnings.len);
       u32 len3 = len;
       buffer[len++] = U':';
       u32 len4 = len;
       static_assert(sizeof(u32) == sizeof(wchar_t));
-      // TODO: actual infos count
-      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len, L"%u", 0);
+      len += swprintf((i32 *) buffer + len, ARRAY_LEN(buffer) - len,
+                      L"%u", editor.infos.len);
       u32 len5 = len;
 
       f32 x = (window->width - tr_measure_text(&str, buffer, len)) * 0.5 - BUFFER_PADDING;
@@ -730,6 +741,7 @@ i32 main(i32 argc, char **argv) {
   }
   if (editor.main_buffers.items)
     free(editor.main_buffers.items);
+  editor_clear_entries(&editor);
 
   sr_delete(&sr);
   tr_delete(&ptr);
