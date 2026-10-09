@@ -176,14 +176,13 @@ i32 main(i32 argc, char **argv) {
   MainBuffer main_buffer = main_buffer_make(NULL);
   DA_APPEND(editor.main_buffers, main_buffer);
   editor.palette_buffer = buffer_make();
-  editor.current_buffer = &editor.main_buffers.items[0].buffer;
 
   editor.mode = JetModeEditor;
 
   editor.font_scale = DEFAULT_FONT_SCALE;
 
   if (argc > 1) {
-    buffer_read_file(editor.current_buffer, argv[1]);
+    buffer_read_file(editor_current_buffer(&editor), argv[1]);
     editor.main_buffers.items[0].file_path = strdup(argv[1]);
 
     for (u32 i = 2; i < (u32) argc; ++i) {
@@ -258,11 +257,10 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeEnter: {
           if (!is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
-              buffer_insert_new_line(editor.current_buffer);
+              buffer_insert_new_line(editor_current_buffer(&editor));
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
                 if (editor.provider->execute(&editor, editor.options, editor.selected_option)) {
-                  editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
                   editor.mode = JetModeEditor;
                 } else {
                   buffer_remove_line(&editor.palette_buffer);
@@ -276,13 +274,13 @@ i32 main(i32 argc, char **argv) {
           if (!is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
               for (u32 i = 0; i < SPACES_PER_TAB; ++i)
-                buffer_insert(editor.current_buffer, ' ');
+                buffer_insert(editor_current_buffer(&editor), ' ');
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
-                buffer_remove_line(editor.current_buffer);
+                buffer_remove_line(editor_current_buffer(&editor));
                 PaletteOption *option = editor.options.items + editor.selected_option;
                 for (u32 i = 0; i < option->name.len; ++i)
-                  buffer_insert(editor.current_buffer, option->name.ptr[i]);
+                  buffer_insert(editor_current_buffer(&editor), option->name.ptr[i]);
                 editor.selected_option = 0;
               }
             }
@@ -291,16 +289,16 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeBackspace: {
           if (is_ctrl_pressed)
-            buffer_remove_word_before_cursor(editor.current_buffer);
+            buffer_remove_word_before_cursor(editor_current_buffer(&editor));
           else
-            buffer_remove_before_cursor(editor.current_buffer);
+            buffer_remove_before_cursor(editor_current_buffer(&editor));
         } break;
 
         case WinxKeyCodeDelete: {
           if (is_ctrl_pressed)
-            buffer_remove_word_at_cursor(editor.current_buffer);
+            buffer_remove_word_at_cursor(editor_current_buffer(&editor));
           else
-            buffer_remove_at_cursor(editor.current_buffer);
+            buffer_remove_at_cursor(editor_current_buffer(&editor));
         } break;
 
         case WinxKeyCodeLeft: {
@@ -313,10 +311,10 @@ i32 main(i32 argc, char **argv) {
                   editor.current_main_buffer_index = editor.main_buffers.len - 1;
               }
             } else {
-              buffer_move_left_word(editor.current_buffer, is_shift_pressed);
+              buffer_move_left_word(editor_current_buffer(&editor), is_shift_pressed);
             }
           } else {
-            buffer_move_left(editor.current_buffer, is_shift_pressed);
+            buffer_move_left(editor_current_buffer(&editor), is_shift_pressed);
           }
         } break;
 
@@ -330,10 +328,10 @@ i32 main(i32 argc, char **argv) {
                   editor.current_main_buffer_index = 0;
               }
             } else {
-              buffer_move_right_word(editor.current_buffer, is_shift_pressed);
+              buffer_move_right_word(editor_current_buffer(&editor), is_shift_pressed);
             }
           } else {
-            buffer_move_right(editor.current_buffer, is_shift_pressed);
+            buffer_move_right(editor_current_buffer(&editor), is_shift_pressed);
           }
         } break;
 
@@ -351,12 +349,12 @@ i32 main(i32 argc, char **argv) {
                   editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
                 }
               } else {
-                buffer_move_down_paragraph(editor.current_buffer, is_shift_pressed);
+                buffer_move_down_paragraph(editor_current_buffer(&editor), is_shift_pressed);
               }
             } else {
               WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
               u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
-              buffer_move_down(editor.current_buffer,
+              buffer_move_down(editor_current_buffer(&editor),
                                is_shift_pressed,
                                max_visual_line_len);
             }
@@ -381,14 +379,13 @@ i32 main(i32 argc, char **argv) {
                   --editor.entry_cursor;
                   editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
                 }
-                editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
               } else {
-                buffer_move_up_paragraph(editor.current_buffer, is_shift_pressed);
+                buffer_move_up_paragraph(editor_current_buffer(&editor), is_shift_pressed);
               }
             } else {
               WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
               u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
-              buffer_move_up(editor.current_buffer,
+              buffer_move_up(editor_current_buffer(&editor),
                              is_shift_pressed,
                              max_visual_line_len);
             }
@@ -413,13 +410,11 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeP: {
           if (is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
-              editor.current_buffer = &editor.palette_buffer;
               editor.provider = &command_provider;
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
-              buffer_remove_line(editor.current_buffer);
+              buffer_remove_line(editor_current_buffer(&editor));
             } else if (editor.mode == JetModeCommandPalette) {
-              editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
               editor.mode = JetModeEditor;
             }
           }
@@ -427,28 +422,26 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeA: {
           if (is_ctrl_pressed)
-            buffer_goto_line_begin(editor.current_buffer, is_shift_pressed);
+            buffer_goto_line_begin(editor_current_buffer(&editor), is_shift_pressed);
           else if (is_alt_pressed)
-            buffer_goto_buffer_begin(editor.current_buffer, is_shift_pressed);
+            buffer_goto_buffer_begin(editor_current_buffer(&editor), is_shift_pressed);
         } break;
 
         case WinxKeyCodeE: {
           if (is_ctrl_pressed)
-            buffer_goto_line_end(editor.current_buffer, is_shift_pressed);
+            buffer_goto_line_end(editor_current_buffer(&editor), is_shift_pressed);
           else if (is_alt_pressed)
-            buffer_goto_buffer_end(editor.current_buffer, is_shift_pressed);
+            buffer_goto_buffer_end(editor_current_buffer(&editor), is_shift_pressed);
         } break;
 
         case WinxKeyCodeW: {
           if (is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
-              editor.current_buffer = &editor.palette_buffer;
               editor.provider = &error_provider;
               editor.selected_option = editor.entry_cursor;
               editor.mode = JetModeCommandPalette;
-              buffer_remove_line(editor.current_buffer);
+              buffer_remove_line(editor_current_buffer(&editor));
             } else if (editor.mode == JetModeCommandPalette) {
-              editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
               editor.mode = JetModeEditor;
             }
           }
@@ -456,24 +449,22 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeO: {
           if (is_ctrl_pressed && editor.mode == JetModeEditor) {
-            editor.current_buffer = &editor.palette_buffer;
             editor.provider = &open_file_provider;
             editor.selected_option = 0;
             editor.mode = JetModeCommandPalette;
-            buffer_remove_line(editor.current_buffer);
+            buffer_remove_line(editor_current_buffer(&editor));
           }
         } break;
 
         case WinxKeyCodeS: {
           if (is_ctrl_pressed && editor.mode == JetModeEditor && CURRENT_BUFFER().is_dirty) {
             if (is_shift_pressed || !CURRENT_FILE_PATH()) {
-              editor.current_buffer = &editor.palette_buffer;
               editor.provider = &save_file_provider;
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
-              buffer_remove_line(editor.current_buffer);
+              buffer_remove_line(editor_current_buffer(&editor));
             } else {
-              buffer_write_file(editor.current_buffer, CURRENT_FILE_PATH());
+              buffer_write_file(editor_current_buffer(&editor), CURRENT_FILE_PATH());
 
               if (editor.jwrap) {
                 ByteBuffer buffer = {0};
@@ -523,10 +514,8 @@ i32 main(i32 argc, char **argv) {
         } break;
 
         case WinxKeyCodeEscape: {
-          if (editor.mode == JetModeCommandPalette) {
-            editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
+          if (editor.mode == JetModeCommandPalette)
             editor.mode = JetModeEditor;
-          }
         } break;
 
         default: break;
@@ -544,7 +533,7 @@ i32 main(i32 argc, char **argv) {
 
       case WinxEventKindChar: {
         if (!is_ctrl_pressed && !is_alt_pressed)
-          buffer_insert(editor.current_buffer, event.as._char._char);
+          buffer_insert(editor_current_buffer(&editor), event.as._char._char);
       } break;
 
       default: break;
@@ -697,7 +686,7 @@ i32 main(i32 argc, char **argv) {
 
     // Rendering command palette
     if (editor.mode == JetModeCommandPalette) {
-      WideStr line = buffer_get_current_line(editor.current_buffer);
+      WideStr line = buffer_get_current_line(editor_current_buffer(&editor));
 
       tr_set_bg_color(&ptr, BG_COLOR);
       tr_set_fg_color(&ptr, FG_COLOR);

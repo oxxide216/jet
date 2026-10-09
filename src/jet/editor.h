@@ -26,11 +26,10 @@ typedef enum {
 } JetMode;
 
 struct Editor {
-  MainBuffers  main_buffers;
-  Buffer       palette_buffer;
-  Buffer      *current_buffer;
-  u32          current_main_buffer_index;
-  u32          prev_current_main_buffer_index;
+  MainBuffers main_buffers;
+  Buffer      palette_buffer;
+  u32         current_main_buffer_index;
+  u32         prev_current_main_buffer_index;
 
   Provider       *provider;
   PaletteOptions  options;
@@ -55,6 +54,7 @@ struct Editor {
 MainBuffer    main_buffer_make(char *path);
 void          main_buffer_rebuild_entries(MainBuffer *buffer, Editor *editor);
 
+Buffer       *editor_current_buffer(Editor *editor);
 void          editor_clear_entries(Editor *editor);
 MessageEntry *editor_get_entry(Editor *editor, u32 index);
 void          editor_go_to_entry(Editor *editor, MessageEntry *entry);

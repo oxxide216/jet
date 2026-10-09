@@ -46,6 +46,15 @@ void main_buffer_rebuild_entries(MainBuffer *buffer, Editor *editor) {
   }
 }
 
+Buffer *editor_current_buffer(Editor *editor) {
+  switch (editor->mode) {
+  case JetModeEditor:         return &editor->main_buffers.items[editor->current_main_buffer_index].buffer;
+  case JetModeCommandPalette: return &editor->palette_buffer;
+  }
+
+  return NULL;
+}
+
 void editor_clear_entries(Editor *editor) {
   MessageEntries *ptrs[] = {
     &editor->errors,
