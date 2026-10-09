@@ -252,25 +252,28 @@ i32 main(i32 argc, char **argv) {
       is_reading = child_read(&child, &stream);
       printf("%.*s", (i32) (stream.len - stream_cursor), stream.items + stream_cursor);
       stream_cursor = stream.len;
-    }
 
-    if (server_connection) {
-      parse_entries(&entries, &stream);
-      ByteBuffer buffer = {0};
+      if (server_connection) {
+        parse_entries(&entries, &stream);
 
-      for (u32 i = 0; i < entries.len; ++i) {
-        Message message = { MessageKindEntry, { entries.items[i] } };
-        encode_message(&buffer, &message);
+        if (entries.len > 0) {
+          ByteBuffer buffer = {0};
+
+          for (u32 i = 0; i < entries.len; ++i) {
+            Message message = { MessageKindEntry, { entries.items[i] } };
+            encode_message(&buffer, &message);
+          }
+
+          cns_unix_send(server_connection, buffer.items, buffer.len);
+          if (buffer.items)
+            free(buffer.items);
+          for (u32 i = 0; i < entries.len; ++i) {
+            free(entries.items[i].file_path.ptr);
+            free(entries.items[i].message.ptr);
+          }
+          entries.len = 0;
+        }
       }
-
-      cns_unix_send(server_connection, buffer.items, buffer.len);
-      if (buffer.items)
-        free(buffer.items);
-      for (u32 i = 0; i < entries.len; ++i) {
-        free(entries.items[i].file_path.ptr);
-        free(entries.items[i].message.ptr);
-      }
-      entries.len = 0;
     }
 
     cns_step(cns, 10000);
