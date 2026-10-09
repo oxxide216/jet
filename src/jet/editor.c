@@ -109,13 +109,22 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
     buffer_read_file(&main_buffer.buffer, path);
     main_buffer_rebuild_entries(&main_buffer, editor);
     main_buffer.buffer.cursor_row = entry->row - 1;
+    if (main_buffer.buffer.cursor_row > buffer_get_rows(&main_buffer.buffer))
+      main_buffer.buffer.cursor_row = buffer_get_rows(&main_buffer.buffer);
     main_buffer.buffer.cursor_col = entry->col - 1;
+    WideStr line = buffer_get_current_line(&main_buffer.buffer);
+    if (main_buffer.buffer.cursor_col > line.len)
+      main_buffer.buffer.cursor_col = line.len;
     DA_APPEND(editor->main_buffers, main_buffer);
   } else {
     editor->current_main_buffer_index = main_buffer_index;
-    editor->main_buffers.items[editor->current_main_buffer_index].buffer.cursor_row =
-      entry->row - 1;
-    editor->main_buffers.items[editor->current_main_buffer_index].buffer.cursor_col =
-      entry->col - 1;
+    Buffer *buffer = &editor->main_buffers.items[editor->current_main_buffer_index].buffer;
+    buffer->cursor_row = entry->row - 1;
+    if (buffer->cursor_row > buffer_get_rows(buffer))
+      buffer->cursor_row = buffer_get_rows(buffer);
+    buffer->cursor_col = entry->col - 1;
+    WideStr line = buffer_get_current_line(buffer);
+    if (buffer->cursor_col > line.len)
+      buffer->cursor_col = line.len;
   }
 }
