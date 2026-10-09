@@ -1,5 +1,7 @@
 // TODO: Debounce
 
+#include <ctype.h>
+
 #include "shl/shl-defs.h"
 #include "shl/shl-log.h"
 #include "cns/cns.h"
@@ -75,11 +77,20 @@ static void parse_entries(MessageEntries *entries, Stream *stream) {
       }
 
       Str row_str = { stream->items + anchor, cursor - anchor };
-      u32 row = str_to_u32(row_str);
-      if (row == 0) {
+
+      bool all_digits = true;
+      for (u32 i = 0; i < row_str.len; ++i) {
+        if (!isdigit(row_str.ptr[i])) {
+          all_digits = false;
+          break;
+        }
+      }
+      if (!all_digits) {
         free(file_path.ptr);
         break;
       }
+
+      u32 row = str_to_u32(row_str);
 
       ++cursor;
 
@@ -95,11 +106,20 @@ static void parse_entries(MessageEntries *entries, Stream *stream) {
       }
 
       Str col_str = { stream->items + anchor, cursor - anchor };
-      u32 col = str_to_u32(col_str);
-      if (col == 0) {
+
+      all_digits = true;
+      for (u32 i = 0; i < col_str.len; ++i) {
+        if (!isdigit(col_str.ptr[i])) {
+          all_digits = false;
+          break;
+        }
+      }
+      if (!all_digits) {
         free(file_path.ptr);
         break;
       }
+
+      u32 col = str_to_u32(col_str);
 
       ++cursor;
       if (cursor < stream->len)
