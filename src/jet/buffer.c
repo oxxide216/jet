@@ -574,3 +574,7 @@ WideStr buffer_get_line(Buffer *buffer, u32 index) {
     line->len,
   };
 }
+
+u32 buffer_get_rows(Buffer *buffer) {
+  return buffer->lines.len;
+}

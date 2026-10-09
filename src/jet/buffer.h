@@ -50,4 +50,6 @@ WideStr buffer_get_current_line(Buffer *buffer);
 WideStr buffer_get_next_line(Buffer *buffer);
 WideStr buffer_get_line(Buffer *buffer, u32 index);
 
+u32 buffer_get_rows(Buffer *buffer);
+
 #endif // BUFFER_H

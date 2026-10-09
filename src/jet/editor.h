@@ -30,6 +30,7 @@ struct Editor {
   Buffer       palette_buffer;
   Buffer      *current_buffer;
   u32          current_main_buffer_index;
+  u32          prev_current_main_buffer_index;
 
   Provider       *provider;
   PaletteOptions  options;
@@ -46,6 +47,9 @@ struct Editor {
   MessageEntries  warnings;
   MessageEntries  infos;
   u32             entry_cursor;
+
+  u32 prev_current_main_buffer_rows;
+  u32 prev_current_main_buffer_cursor_row;
 };
 
 MainBuffer    main_buffer_make(char *path);

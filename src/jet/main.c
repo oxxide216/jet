@@ -551,6 +551,51 @@ i32 main(i32 argc, char **argv) {
       }
     }
 
+    // Handle document changes to correctly display inline errors
+    if (editor.mode == JetModeEditor &&
+        (CURRENT_ERRORS().len > 0 ||
+         CURRENT_WARNINGS().len > 0 ||
+         CURRENT_INFOS().len > 0)) {
+      u32 current_main_buffer_rows = buffer_get_rows(&CURRENT_BUFFER());
+      if (editor.prev_current_main_buffer_index != editor.current_main_buffer_index) {
+        editor.prev_current_main_buffer_index = editor.current_main_buffer_index;
+        editor.prev_current_main_buffer_rows = buffer_get_rows(&CURRENT_BUFFER());
+      } else {
+        MessageEntryPtrs *ptrs[] = {
+          &CURRENT_ERRORS(),
+          &CURRENT_WARNINGS(),
+          &CURRENT_INFOS(),
+        };
+
+        if (editor.prev_current_main_buffer_rows > current_main_buffer_rows) {
+          // Removed lines
+          u32 diff = editor.prev_current_main_buffer_rows - current_main_buffer_rows;
+          for (u32 i = 0; i < ARRAY_LEN(ptrs); ++i) {
+            for (u32 j = CURRENT_BUFFER().cursor_row + diff; j < ptrs[i]->len; ++j) {
+              ptrs[i]->items[j - diff] = ptrs[i]->items[j];
+              if (j > editor.prev_current_main_buffer_cursor_row + diff + 1)
+                ptrs[i]->items[j] = NULL;
+            }
+          }
+          editor.prev_current_main_buffer_rows = current_main_buffer_rows;
+        } else if (editor.prev_current_main_buffer_rows < current_main_buffer_rows) {
+          // Added lines
+          u32 diff = current_main_buffer_rows - editor.prev_current_main_buffer_rows;
+          for (u32 i = 0; i < ARRAY_LEN(ptrs); ++i) {
+            while (ptrs[i]->len < current_main_buffer_rows)
+              DA_APPEND(*ptrs[i], NULL);
+
+            for (u32 j = ptrs[i]->len; j > CURRENT_BUFFER().cursor_row + diff - 1; --j) {
+              ptrs[i]->items[j - 1] = ptrs[i]->items[j - 1 - diff];
+              ptrs[i]->items[j - 1 - diff] = NULL;
+            }
+          }
+          editor.prev_current_main_buffer_rows = current_main_buffer_rows;
+        }
+      }
+    }
+    editor.prev_current_main_buffer_cursor_row = CURRENT_BUFFER().cursor_row;
+
     cns_step(cns, 1);
 
     if (!vik_begin_frame(executor, BG_COLOR, 1.0)) {
