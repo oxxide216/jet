@@ -612,7 +612,7 @@ i32 main(i32 argc, char **argv) {
         // Inline error reporting
         if (i < CURRENT_ERRORS().len && CURRENT_ERRORS().items[i]) {
           Str *message = &CURRENT_ERRORS().items[i]->message;
-          u32 *text = alloca(message->len * sizeof(*text));
+          u32 *text = malloc(message->len * sizeof(*text));
           for (u32 j = 0; j < message->len; ++j)
             text[j] = message->ptr[j];
           tr_set_fg_color(&tr, ERROR_COLOR);
@@ -620,9 +620,10 @@ i32 main(i32 argc, char **argv) {
                        message->len, x + space_width * INLINE_ERROR_OFFSET_MULTIPLIER,
                        new_y - editor.font_scale);
           tr_set_fg_color(&tr, FG_COLOR);
+          free(text);
         } else if (i < CURRENT_WARNINGS().len && CURRENT_WARNINGS().items[i]) {
           Str *message = &CURRENT_WARNINGS().items[i]->message;
-          u32 *text = alloca(message->len * sizeof(*text));
+          u32 *text = malloc(message->len * sizeof(*text));
           for (u32 j = 0; j < message->len; ++j)
             text[j] = message->ptr[j];
           tr_set_fg_color(&tr, WARN_COLOR);
@@ -630,9 +631,10 @@ i32 main(i32 argc, char **argv) {
                        message->len, x + space_width * INLINE_ERROR_OFFSET_MULTIPLIER,
                        new_y - editor.font_scale);
           tr_set_fg_color(&tr, FG_COLOR);
+          free(text);
         } else if (i < CURRENT_INFOS().len && CURRENT_INFOS().items[i]) {
           Str *message = &CURRENT_INFOS().items[i]->message;
-          u32 *text = alloca(message->len * sizeof(*text));
+          u32 *text = malloc(message->len * sizeof(*text));
           for (u32 j = 0; j < message->len; ++j)
             text[j] = message->ptr[j];
           tr_set_fg_color(&tr, INFO_COLOR);
@@ -640,6 +642,7 @@ i32 main(i32 argc, char **argv) {
                        message->len, x + space_width * INLINE_ERROR_OFFSET_MULTIPLIER,
                        new_y - editor.font_scale);
           tr_set_fg_color(&tr, FG_COLOR);
+          free(text);
         }
       }
 
