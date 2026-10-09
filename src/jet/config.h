@@ -21,6 +21,8 @@
 
 #define SHADOW_COLOR 0.0, 0.0, 0.0, 0.5
 
+#define INLINE_ERROR_OFFSET_MULTIPLIER 2.0
+
 #define BG_COLOR     0x18/255.0, 0x18/255.0, 0x18/255.0
 #define FG_COLOR     0x86/255.0, 0x8a/255.0, 0xac/255.0
 #define ACC_COLOR    0x82/255.0, 0x53/255.0, 0xa1/255.0

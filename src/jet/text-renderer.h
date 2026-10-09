@@ -94,7 +94,7 @@ void         tr_set_fg_color(TextRenderer *tr, f32 r, f32 g, f32 b);
 void         tr_set_sel_color(TextRenderer *tr, f32 r, f32 g, f32 b);
 f32          tr_measure_text(TextRenderer *tr, u32 *text, u32 text_len);
 f32          tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len,
-                          f32 x, f32 y, f32 x_limit);
+                          f32 x, f32 y, f32 x_limit, f32 *out_x);
 void         tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y);
 void         tr_end_frame(TextRenderer *tr);
 void         tr_delete(TextRenderer *tr);

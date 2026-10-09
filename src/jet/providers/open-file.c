@@ -49,6 +49,7 @@ static bool execute(Editor *editor, PaletteOptions options, u32 index) {
     editor->current_main_buffer_index = editor->main_buffers.len;
     MainBuffer main_buffer = main_buffer_make(path);
     buffer_read_file(&main_buffer.buffer, path);
+    main_buffer_rebuild_entries(&main_buffer, editor);
     DA_APPEND(editor->main_buffers, main_buffer);
 
     return true;

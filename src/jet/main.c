@@ -33,6 +33,15 @@
 #define CURRENT_ABS_FILE_PATH()                                             \
   editor.main_buffers.items[editor.current_main_buffer_index].abs_file_path
 
+#define CURRENT_ERRORS()                                             \
+  editor.main_buffers.items[editor.current_main_buffer_index].errors
+
+#define CURRENT_WARNINGS()                                             \
+  editor.main_buffers.items[editor.current_main_buffer_index].warnings
+
+#define CURRENT_INFOS()                                             \
+  editor.main_buffers.items[editor.current_main_buffer_index].infos
+
 static u32 get_max_visual_line_len(WideStr line, WinxWindow *window, TextRenderer *tr) {
   f32 editor_width = window->width - BUFFER_PADDING * 2.0;
   f32 line_width = tr_measure_text(tr, line.ptr, line.len);
@@ -106,6 +115,9 @@ static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *dat
       }
     }
   }
+
+  for (u32 i = 0; i < editor->main_buffers.len; ++i)
+    main_buffer_rebuild_entries(editor->main_buffers.items + i, editor);
 
   return CnsResultOk;
 }
@@ -494,6 +506,12 @@ i32 main(i32 argc, char **argv) {
               free(CURRENT_FILE_PATH());
             if (CURRENT_ABS_FILE_PATH().ptr)
               free(CURRENT_ABS_FILE_PATH().ptr);
+            if (CURRENT_ERRORS().items)
+              free(CURRENT_ERRORS().items);
+            if (CURRENT_WARNINGS().items)
+              free(CURRENT_WARNINGS().items);
+            if (CURRENT_INFOS().items)
+              free(CURRENT_INFOS().items);
             DA_REMOVE_AT(editor.main_buffers, editor.current_main_buffer_index);
             if (editor.main_buffers.len == 0) {
               MainBuffer main_buffer = main_buffer_make(NULL);
@@ -562,6 +580,9 @@ i32 main(i32 argc, char **argv) {
 
     // Rendering main buffer
     {
+      tr_set_bg_color(&tr, BG_COLOR);
+      tr_set_fg_color(&tr, FG_COLOR);
+
       tr.x_lower_limit = 0.0;
       tr.x_higher_limit = window->width;
 
@@ -570,18 +591,56 @@ i32 main(i32 argc, char **argv) {
 
       tr.line_index = CURRENT_SCROLL();
 
+      u32 space = U' ';
+      f32 space_width = tr_measure_text(&tr, &space, 1);
+
       u32 visible_lines = 0;
 
       f32 y = BUFFER_PADDING;
       for (u32 i = CURRENT_SCROLL(); i < CURRENT_BUFFER().lines.len; ++i) {
         WideStr line = buffer_get_line(&CURRENT_BUFFER(), i);
+        f32 x;
         f32 new_y = tr_draw_line(&tr, line.ptr, line.len,
                                  BUFFER_PADDING, y,
-                                 window->width - BUFFER_PADDING * 2.0);
+                                 window->width - BUFFER_PADDING * 2.0,
+                                 &x);
         if (new_y >= window->height - editor.font_scale - BUFFER_PADDING * 3.0)
           break;
         y = new_y;
         ++visible_lines;
+
+        // Inline error reporting
+        if (i < CURRENT_ERRORS().len && CURRENT_ERRORS().items[i]) {
+          Str *message = &CURRENT_ERRORS().items[i]->message;
+          u32 *text = alloca(message->len * sizeof(*text));
+          for (u32 j = 0; j < message->len; ++j)
+            text[j] = message->ptr[j];
+          tr_set_fg_color(&tr, ERROR_COLOR);
+          tr_draw_text(&tr, text,
+                       message->len, x + space_width * INLINE_ERROR_OFFSET_MULTIPLIER,
+                       new_y - editor.font_scale);
+          tr_set_fg_color(&tr, FG_COLOR);
+        } else if (i < CURRENT_WARNINGS().len && CURRENT_WARNINGS().items[i]) {
+          Str *message = &CURRENT_WARNINGS().items[i]->message;
+          u32 *text = alloca(message->len * sizeof(*text));
+          for (u32 j = 0; j < message->len; ++j)
+            text[j] = message->ptr[j];
+          tr_set_fg_color(&tr, WARN_COLOR);
+          tr_draw_text(&tr, text,
+                       message->len, x + space_width * INLINE_ERROR_OFFSET_MULTIPLIER,
+                       new_y - editor.font_scale);
+          tr_set_fg_color(&tr, FG_COLOR);
+        } else if (i < CURRENT_INFOS().len && CURRENT_INFOS().items[i]) {
+          Str *message = &CURRENT_INFOS().items[i]->message;
+          u32 *text = alloca(message->len * sizeof(*text));
+          for (u32 j = 0; j < message->len; ++j)
+            text[j] = message->ptr[j];
+          tr_set_fg_color(&tr, INFO_COLOR);
+          tr_draw_text(&tr, text,
+                       message->len, x + space_width * INLINE_ERROR_OFFSET_MULTIPLIER,
+                       new_y - editor.font_scale);
+          tr_set_fg_color(&tr, FG_COLOR);
+        }
       }
 
       if (CURRENT_SCROLL() + visible_lines < CURRENT_BUFFER().cursor_row + 1)
@@ -665,7 +724,7 @@ i32 main(i32 argc, char **argv) {
       tr_draw_line(&ptr, line.ptr, line.len,
                    window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH - editor.palette_scroll_x,
                    window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH,
-                   INFINITY);
+                   INFINITY, NULL);
 
       editor.provider->free_opts(editor.options);
       editor.options = editor.provider->get_opts(&editor, line);
@@ -801,6 +860,12 @@ i32 main(i32 argc, char **argv) {
     buffer_delete(&editor.main_buffers.items[i].buffer);
     if (editor.main_buffers.items[i].file_path)
       free(editor.main_buffers.items[i].file_path);
+    if (editor.main_buffers.items[i].errors.items)
+      free(editor.main_buffers.items[i].errors.items);
+    if (editor.main_buffers.items[i].warnings.items)
+      free(editor.main_buffers.items[i].warnings.items);
+    if (editor.main_buffers.items[i].infos.items)
+      free(editor.main_buffers.items[i].infos.items);
   }
   if (editor.main_buffers.items)
     free(editor.main_buffers.items);

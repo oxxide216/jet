@@ -6,11 +6,16 @@
 #include "../common/protocol.h"
 #include "cns/cns.h"
 
+typedef Da(MessageEntry *) MessageEntryPtrs;
+
 typedef struct {
-  Buffer  buffer;
-  u32     scroll;
-  char   *file_path;
-  Str     abs_file_path;
+  Buffer            buffer;
+  u32               scroll;
+  char             *file_path;
+  Str               abs_file_path;
+  MessageEntryPtrs  errors;
+  MessageEntryPtrs  warnings;
+  MessageEntryPtrs  infos;
 } MainBuffer;
 
 typedef Da(MainBuffer) MainBuffers;
@@ -44,6 +49,8 @@ struct Editor {
 };
 
 MainBuffer    main_buffer_make(char *path);
+void          main_buffer_rebuild_entries(MainBuffer *buffer, Editor *editor);
+
 void          editor_clear_entries(Editor *editor);
 MessageEntry *editor_get_entry(Editor *editor, u32 index);
 void          editor_go_to_entry(Editor *editor, MessageEntry *entry);

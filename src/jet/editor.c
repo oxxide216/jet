@@ -13,7 +13,37 @@ MainBuffer main_buffer_make(char *path) {
     memcpy(abs_path.ptr + cwd.len + 1, path, path_len * sizeof(*path));
     free(cwd.ptr);
   }
-  return (MainBuffer) { buffer_make(), 0.0, path, abs_path };
+  return (MainBuffer) { buffer_make(), 0.0, path, abs_path, {}, {}, {} };
+}
+
+void main_buffer_rebuild_entries(MainBuffer *buffer, Editor *editor) {
+  buffer->errors.len = 0;
+  buffer->warnings.len = 0;
+  buffer->infos.len = 0;
+
+  for (u32 i = 0; i < editor->errors.len; ++i) {
+    if (str_eq(editor->errors.items[i].file_path, buffer->abs_file_path)) {
+      while (buffer->errors.len < editor->errors.items[i].row)
+        DA_APPEND(buffer->errors, NULL);
+      buffer->errors.items[editor->errors.items[i].row - 1] = editor->errors.items + i;
+    }
+  }
+
+  for (u32 i = 0; i < editor->warnings.len; ++i) {
+    if (str_eq(editor->warnings.items[i].file_path, buffer->abs_file_path)) {
+      while (buffer->warnings.len < editor->warnings.items[i].row)
+        DA_APPEND(buffer->warnings, NULL);
+      buffer->warnings.items[editor->warnings.items[i].row - 1] = editor->warnings.items + i;
+    }
+  }
+
+  for (u32 i = 0; i < editor->infos.len; ++i) {
+    if (str_eq(editor->infos.items[i].file_path, buffer->abs_file_path)) {
+      while (buffer->infos.len < editor->infos.items[i].row)
+        DA_APPEND(buffer->infos, NULL);
+      buffer->infos.items[editor->infos.items[i].row - 1] = editor->infos.items + i;
+    }
+  }
 }
 
 void editor_clear_entries(Editor *editor) {
@@ -68,6 +98,7 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
     editor->current_main_buffer_index = editor->main_buffers.len;
     MainBuffer main_buffer = main_buffer_make(new_rel_path);
     buffer_read_file(&main_buffer.buffer, path);
+    main_buffer_rebuild_entries(&main_buffer, editor);
     main_buffer.buffer.cursor_row = entry->row - 1;
     main_buffer.buffer.cursor_col = entry->col - 1;
     DA_APPEND(editor->main_buffers, main_buffer);
