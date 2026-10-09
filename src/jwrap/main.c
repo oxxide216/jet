@@ -152,6 +152,7 @@ static void parse_entries(MessageEntries *entries, Stream *stream) {
         break;
       }
 
+      message.len = cursor - anchor;
       message.ptr = malloc(message.len * sizeof(*message.ptr));
       memcpy(message.ptr, stream->items + anchor, message.len);
 
