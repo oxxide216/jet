@@ -727,9 +727,9 @@ i32 main(i32 argc, char **argv) {
       tr_draw_text(&str, buffer, len, BUFFER_PADDING, y);
 
       if (editor.jwrap ||
-         editor.errors.len > 0 ||
-         editor.warnings.len > 0 ||
-         editor.infos.len > 0) {
+          editor.errors.len > 0 ||
+          editor.warnings.len > 0 ||
+          editor.infos.len > 0) {
         len = 0;
         if (editor.jwrap) {
           buffer[len++] = U'✔';
