@@ -171,7 +171,7 @@ static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *dat
   Message message;
   while (len > 0 && decode_message(&message, &data, &len)) {
     if (message.kind == MessageKindRerun) {
-      child_wait(&child)
+      child_wait(&child);
       child = run_command_capturing_output(global_argv);
       is_reading = true;
     }
