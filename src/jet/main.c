@@ -203,7 +203,7 @@ i32 main(i32 argc, char **argv) {
 
   CnsListenInfo listen_info = {
     .proto = CnsProtoUnix,
-    .receive_timeout = 15,
+    .receive_timeout = 1,
     .connected_cb = connected,
     .data_cb = data,
     .disconnected_cb = disconnected,
