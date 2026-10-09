@@ -281,7 +281,7 @@ i32 main(i32 argc, char **argv) {
       }
     }
 
-    cns_step(cns, 10000);
+    cns_step(cns, 1000);
   }
 
   cns_destroy(cns);
