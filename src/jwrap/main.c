@@ -272,6 +272,8 @@ i32 main(i32 argc, char **argv) {
             free(entries.items[i].message.ptr);
           }
           entries.len = 0;
+          stream.len = 0;
+          stream_cursor = 0;
         }
       }
     }
