@@ -1,7 +1,8 @@
+// TODO: separate glyph atlas from text renderer and reuse it
+
 #include <wchar.h>
 
 #include "shl/shl-defs.h"
-#include "shl/shl-str.h"
 #include "shl/shl-log.h"
 #include "viking/viking.h"
 #include "winx/event.h"
@@ -17,17 +18,19 @@
 #include "config.h"
 #define STB_TRUETYPE_IMPLEMENTATION
 #include "stb_truetype.h"
+#define SHL_STR_IMPLEMENTATION
+#include "shl/shl-str.h"
 
-#define CURRENT_BUFFER()                                              \
+#define CURRENT_BUFFER()                                             \
   editor.main_buffers.items[editor.current_main_buffer_index].buffer
 
-#define CURRENT_SCROLL()                                              \
+#define CURRENT_SCROLL()                                             \
   editor.main_buffers.items[editor.current_main_buffer_index].scroll
 
 #define CURRENT_FILE_PATH()                                             \
   editor.main_buffers.items[editor.current_main_buffer_index].file_path
 
-#define CURRENT_ABS_FILE_PATH()                                         \
+#define CURRENT_ABS_FILE_PATH()                                             \
   editor.main_buffers.items[editor.current_main_buffer_index].abs_file_path
 
 static u32 get_max_visual_line_len(WideStr line, WinxWindow *window, TextRenderer *tr) {
@@ -70,10 +73,8 @@ static void get_buffer_selection_bounds(Buffer *buffer,
 }
 
 static CnsResult connected(CnsCtx *ctx, CnsConnection *connection) {
-  (void) connection;
-
   Editor *editor = cns_get_user_data(ctx);
-  editor->is_jwrap_connected = true;
+  editor->jwrap = connection;
 
   return CnsResultOk;
 }
@@ -82,12 +83,21 @@ static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *dat
   (void) ctx;
   (void) connection;
 
+  if (data_len < sizeof(u32))
+    return CnsResultOk;
+
+  u32 entries_len = *(u32 *) data;
+  data += sizeof(u32);
+  data_len -= sizeof(u32);
+
   Editor *editor = cns_get_user_data(ctx);
   editor_clear_entries(editor);
+  editor->entry_cursor = (u32) -1;
 
   u32 len = data_len;
   Message message;
-  while (len > 0 && decode_message(&message, &data, &len)) {
+  for (u32 i = 0; i < entries_len; ++i) {
+    decode_message(&message, &data, &len);
     if (message.kind == MessageKindEntry) {
       switch (message.as.entry.kind) {
       case EntryKindError: DA_APPEND(editor->errors,   message.as.entry); break;
@@ -104,7 +114,7 @@ static void disconnected(CnsCtx *ctx, CnsConnection *connection) {
   (void) connection;
 
   Editor *editor = cns_get_user_data(ctx);
-  editor->is_jwrap_connected = false;
+  editor->jwrap = NULL;
 }
 
 i32 main(i32 argc, char **argv) {
@@ -239,7 +249,7 @@ i32 main(i32 argc, char **argv) {
               buffer_insert_new_line(editor.current_buffer);
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
-                if (editor.provider->execute(&editor, editor.selected_option)) {
+                if (editor.provider->execute(&editor, editor.options, editor.selected_option)) {
                   editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
                   editor.mode = JetModeEditor;
                 } else {
@@ -258,9 +268,9 @@ i32 main(i32 argc, char **argv) {
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
                 buffer_remove_line(editor.current_buffer);
-                WideStr *option = editor.options.items + editor.selected_option;
-                for (u32 i = 0; i < option->len; ++i)
-                  buffer_insert(editor.current_buffer, option->ptr[i]);
+                PaletteOption *option = editor.options.items + editor.selected_option;
+                for (u32 i = 0; i < option->name.len; ++i)
+                  buffer_insert(editor.current_buffer, option->name.ptr[i]);
                 editor.selected_option = 0;
               }
             }
@@ -318,7 +328,19 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeDown: {
           if (editor.mode == JetModeEditor) {
             if (is_ctrl_pressed) {
-              buffer_move_down_paragraph(editor.current_buffer, is_shift_pressed);
+              if (is_alt_pressed) {
+                u32 len = editor.errors.len + editor.warnings.len + editor.infos.len;
+                if (editor.entry_cursor == (u32) -1) {
+                  editor.entry_cursor = 0;
+                  if (editor.entry_cursor < len)
+                    editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
+                } else if (editor.entry_cursor + 1 < len) {
+                  ++editor.entry_cursor;
+                  editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
+                }
+              } else {
+                buffer_move_down_paragraph(editor.current_buffer, is_shift_pressed);
+              }
             } else {
               WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
               u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
@@ -337,7 +359,20 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeUp: {
           if (editor.mode == JetModeEditor) {
             if (is_ctrl_pressed) {
-              buffer_move_up_paragraph(editor.current_buffer, is_shift_pressed);
+              if (is_alt_pressed) {
+                if (editor.entry_cursor == (u32) -1) {
+                  u32 len = editor.errors.len + editor.warnings.len + editor.infos.len;
+                  editor.entry_cursor = len == 0 ? 0 : len - 1;
+                  if (editor.entry_cursor < len)
+                    editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
+                } else if (editor.entry_cursor > 0) {
+                  --editor.entry_cursor;
+                  editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
+                }
+                editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
+              } else {
+                buffer_move_up_paragraph(editor.current_buffer, is_shift_pressed);
+              }
             } else {
               WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
               u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
@@ -392,6 +427,21 @@ i32 main(i32 argc, char **argv) {
             buffer_goto_buffer_end(editor.current_buffer, is_shift_pressed);
         } break;
 
+        case WinxKeyCodeW: {
+          if (is_ctrl_pressed) {
+            if (editor.mode == JetModeEditor) {
+              editor.current_buffer = &editor.palette_buffer;
+              editor.provider = &error_provider;
+              editor.selected_option = editor.entry_cursor;
+              editor.mode = JetModeCommandPalette;
+              buffer_remove_line(editor.current_buffer);
+            } else if (editor.mode == JetModeCommandPalette) {
+              editor.current_buffer = &editor.main_buffers.items[editor.current_main_buffer_index].buffer;
+              editor.mode = JetModeEditor;
+            }
+          }
+        } break;
+
         case WinxKeyCodeO: {
           if (is_ctrl_pressed && editor.mode == JetModeEditor) {
             editor.current_buffer = &editor.palette_buffer;
@@ -403,7 +453,7 @@ i32 main(i32 argc, char **argv) {
         } break;
 
         case WinxKeyCodeS: {
-          if (is_ctrl_pressed && editor.mode == JetModeEditor) {
+          if (is_ctrl_pressed && editor.mode == JetModeEditor && CURRENT_BUFFER().is_dirty) {
             if (is_shift_pressed || !CURRENT_FILE_PATH()) {
               editor.current_buffer = &editor.palette_buffer;
               editor.provider = &save_file_provider;
@@ -412,6 +462,14 @@ i32 main(i32 argc, char **argv) {
               buffer_remove_line(editor.current_buffer);
             } else {
               buffer_write_file(editor.current_buffer, CURRENT_FILE_PATH());
+
+              if (editor.jwrap) {
+                ByteBuffer buffer = {0};
+                Message message = { MessageKindRerun, {} };
+                encode_message(&buffer, &message);
+                cns_unix_send(editor.jwrap, buffer.items, buffer.len);
+                free(buffer.items);
+              }
             }
           }
         } break;
@@ -610,13 +668,13 @@ i32 main(i32 argc, char **argv) {
                    INFINITY);
 
       editor.provider->free_opts(editor.options);
-      editor.options = editor.provider->get_opts(line);
+      editor.options = editor.provider->get_opts(&editor, line);
 
       if (editor.palette_scroll_y > editor.selected_option)
         editor.palette_scroll_y = editor.selected_option;
 
       for (u32 i = editor.palette_scroll_y; i < editor.options.len; ++i) {
-        WideStr *option = editor.options.items + i;
+        PaletteOption *option = editor.options.items + i;
         f32 x = window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH;
         f32 y = window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 3.0 + PALETTE_BORDER_WIDTH + editor.font_scale * (i + 1);
 
@@ -624,8 +682,8 @@ i32 main(i32 argc, char **argv) {
           break;
 
         if (i == editor.selected_option) {
-          tr_set_bg_color(&ptr, FG_COLOR);
-          tr_set_fg_color(&ptr, BG_COLOR);
+          tr_set_bg_color(&ptr, option->fg_r, option->fg_g, option->fg_b);
+          tr_set_fg_color(&ptr, option->bg_r, option->bg_g, option->bg_b);
 
           sr_draw_rect(&sr,
                        window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
@@ -634,11 +692,11 @@ i32 main(i32 argc, char **argv) {
                        editor.font_scale,
                        ACC_COLOR, PALETTE_ALPHA);
         } else {
-          tr_set_bg_color(&ptr, BG_COLOR);
-          tr_set_fg_color(&ptr, FG_COLOR);
+          tr_set_bg_color(&ptr, option->bg_r, option->bg_g, option->bg_b);
+          tr_set_fg_color(&ptr, option->fg_r, option->fg_g, option->fg_b);
         }
 
-        tr_draw_text(&ptr, option->ptr, option->len, x, y);
+        tr_draw_text(&ptr, option->name.ptr, option->name.len, x, y);
       }
     }
 
@@ -668,12 +726,12 @@ i32 main(i32 argc, char **argv) {
                          CURRENT_BUFFER().cursor_col + 1);
       tr_draw_text(&str, buffer, len, BUFFER_PADDING, y);
 
-      if (editor.is_jwrap_connected ||
+      if (editor.jwrap ||
          editor.errors.len > 0 ||
          editor.warnings.len > 0 ||
          editor.infos.len > 0) {
         len = 0;
-        if (editor.is_jwrap_connected) {
+        if (editor.jwrap) {
           buffer[len++] = U'✔';
           buffer[len++] = U' ';
         }

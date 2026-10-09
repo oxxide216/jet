@@ -4,6 +4,7 @@
 #include "buffer.h"
 #include "provider.h"
 #include "../common/protocol.h"
+#include "cns/cns.h"
 
 typedef struct {
   Buffer  buffer;
@@ -25,23 +26,26 @@ struct Editor {
   Buffer      *current_buffer;
   u32          current_main_buffer_index;
 
-  Provider *provider;
-  WideStrs  options;
-  u32       selected_option;
-  f32       palette_scroll_x;
-  u32       palette_scroll_y;
+  Provider       *provider;
+  PaletteOptions  options;
+  u32             selected_option;
+  f32             palette_scroll_x;
+  u32             palette_scroll_y;
 
   JetMode mode;
 
   f32 font_scale;
 
-  bool           is_jwrap_connected;
-  MessageEntries errors;
-  MessageEntries warnings;
-  MessageEntries infos;
+  CnsConnection  *jwrap;
+  MessageEntries  errors;
+  MessageEntries  warnings;
+  MessageEntries  infos;
+  u32             entry_cursor;
 };
 
-MainBuffer main_buffer_make(char *path);
-void       editor_clear_entries(Editor *editor);
+MainBuffer    main_buffer_make(char *path);
+void          editor_clear_entries(Editor *editor);
+MessageEntry *editor_get_entry(Editor *editor, u32 index);
+void          editor_go_to_entry(Editor *editor, MessageEntry *entry);
 
 #endif // EDITOR_H

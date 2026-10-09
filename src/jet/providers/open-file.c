@@ -5,42 +5,42 @@
 
 #include "../provider.h"
 #include "../editor.h"
+#include "../config.h"
 
-static WideStrs opts = {0};
+static PaletteOptions get_opts(Editor *editor, WideStr content) {
+  (void) editor;
 
-static WideStrs get_opts(WideStr content) {
   DIR *dir = opendir(".");
   if (!dir)
-    return (WideStrs) {0};
+    return (PaletteOptions) {0};
 
-  WideStrs result = {0};
+  PaletteOptions result = {0};
 
   struct dirent *entry;
   while ((entry = readdir(dir))) {
     Str name = { entry->d_name, strlen(entry->d_name) };
     WideStr wide_name = str_to_wide_str(name);
     if (wide_str_begins_with(wide_name, content))
-      DA_APPEND(result, wide_name);
+      DA_APPEND(result, ((PaletteOption) { wide_name, BG_COLOR, FG_COLOR }));
     else
       free(wide_name.ptr);
   }
 
   closedir(dir);
 
-  opts = result;
   return result;
 }
 
-static void free_opts(WideStrs options) {
+static void free_opts(PaletteOptions options) {
   for (u32 i = 0; i < options.len; ++i)
-    free(options.items[i].ptr);
+    free(options.items[i].name.ptr);
   if (options.len > 0)
     free(options.items);
 }
 
-static bool execute(Editor *editor, u32 index) {
+static bool execute(Editor *editor, PaletteOptions options, u32 index) {
   struct stat stat_data;
-  char *path = wide_str_to_cstr(opts.items[index]);
+  char *path = wide_str_to_cstr(options.items[index].name);
   if (lstat(path, &stat_data) < 0)
     return false;
 

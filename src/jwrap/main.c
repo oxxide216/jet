@@ -259,6 +259,9 @@ i32 main(i32 argc, char **argv) {
         if (entries.len > 0) {
           ByteBuffer buffer = {0};
 
+          for (u32 i = 0; i < sizeof(u32); ++i)
+            DA_APPEND(buffer, ((u8 *) &entries.len)[i]);
+
           for (u32 i = 0; i < entries.len; ++i) {
             Message message = { MessageKindEntry, { entries.items[i] } };
             encode_message(&buffer, &message);
