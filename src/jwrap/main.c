@@ -179,7 +179,7 @@ static CnsResult connected(CnsCtx *ctx, CnsConnection *connection) {
 
   server_connection = connection;
 
-  INFO("Connected to server\n");
+  INFO("Connected to Jet\n");
 
   return CnsResultOk;
 }
@@ -205,7 +205,7 @@ static void disconnected(CnsCtx *ctx, CnsConnection *connection) {
   (void) ctx;
   (void) connection;
 
-  INFO("Disconnected from server, shutting down\n");
+  INFO("Disconnected from Jet, shutting down\n");
 
   is_running = false;
 }
