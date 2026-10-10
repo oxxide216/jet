@@ -2,6 +2,7 @@
 #define SHAPE_RENDERER_H
 
 #include "viking/viking.h"
+#include "common.h"
 
 typedef struct {
   f32 screen_width;
@@ -22,8 +23,6 @@ typedef struct {
 } CircleVertex;
 
 typedef Da(CircleVertex) CircleVertices;
-
-typedef Da(u32) Indices;
 
 typedef struct {
   ShapeUBO        ubo_data;

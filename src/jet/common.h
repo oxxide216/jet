@@ -15,6 +15,8 @@ typedef Da(WideStr) WideStrs;
 
 typedef Da(u32) WideStringBuilder;
 
+typedef Da(u32) Indices;
+
 bool      wide_str_begins_with(WideStr str, WideStr prefix);
 WideStrs  wide_strs_select_prefixed(WideStrs strs, WideStr content);
 WideStr   wide_str_dup(WideStr str);

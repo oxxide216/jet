@@ -259,7 +259,7 @@ i32 main(i32 argc, char **argv) {
               if (editor.completing &&
                   editor.completions_scroll < editor.actual_completions.len) {
                 WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
-                WideStr word = buffer_get_word_before_cursor(&CURRENT_BUFFER());
+                WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
                 Completion *completion =
                   editor.actual_completions.items + editor.completions_scroll;
                 while (CURRENT_BUFFER().cursor_col < line.len &&
@@ -662,28 +662,30 @@ i32 main(i32 argc, char **argv) {
     if (CURRENT_BUFFER().is_selecting)
       editor.completing = false;
 
-    // Update actual completions
     if (editor.completing) {
-      WideStr word = buffer_get_word_before_cursor(&CURRENT_BUFFER());
+      // Update actual completions
+      WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
       if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
         editor.actual_completions.len = 0;
         for (u32 i = 0; i < editor.completions.len; ++i) {
-          Completion *completion = editor.completions.items + i;
-          WideStr completion_wstr = { completion->wsb.items, completion->wsb.len };
-          if (wide_str_begins_with(completion_wstr, word) &&
-              completion_wstr.len > word.len) {
+          Completion *completion0 = editor.completions.items + i;
+          WideStr completion0_wstr = { completion0->wsb.items, completion0->wsb.len };
+          if (wide_str_begins_with(completion0_wstr, word) &&
+              completion0_wstr.len > word.len) {
             bool already_exists = false;
             for (u32 j = 0; j < editor.actual_completions.len; ++j) {
-              Completion *actual_completion = editor.actual_completions.items + j;
-              WideStr actual_completion_wstr =
-                { actual_completion->wsb.items, actual_completion->wsb.len };
-              if (wide_str_eq(actual_completion_wstr, completion_wstr)) {
+              Completion *completion1 = editor.completions.items + j;
+              WideStr completion1_wstr = {
+                completion1->wsb.items,
+                completion1->wsb.len,
+              };
+              if (wide_str_eq(completion0_wstr, completion1_wstr)) {
                 already_exists = true;
                 break;
               }
             }
             if (!already_exists)
-              DA_APPEND(editor.actual_completions, *completion);
+              DA_APPEND(editor.actual_completions, *completion0);
           }
         }
 
@@ -793,7 +795,7 @@ i32 main(i32 argc, char **argv) {
 
     if (editor.mode == JetModeEditor) {
       if (editor.completing && !CURRENT_BUFFER().is_selecting) {
-        WideStr word = buffer_get_word_before_cursor(&CURRENT_BUFFER());
+        WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
         if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
           if (editor.actual_completions.len > 0) {
             // Rendering completion options

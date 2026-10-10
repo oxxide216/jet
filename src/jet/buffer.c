@@ -582,7 +582,7 @@ u32 buffer_get_rows(Buffer *buffer) {
   return buffer->lines.len;
 }
 
-WideStr buffer_get_word_before_cursor(Buffer *buffer) {
+WideStr buffer_get_word_at_cursor(Buffer *buffer) {
   WideStr result = buffer_get_current_line(buffer);
   u32 line_len = result.len;
   result.ptr += buffer->cursor_col;

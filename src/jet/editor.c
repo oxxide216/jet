@@ -266,17 +266,14 @@ void editor_update_current_row_completions_begin(Editor *editor) {
     editor->prev_cursor_row = main_buffer->buffer.cursor_row;
   } else if (editor->prev_cursor_row > main_buffer->buffer.cursor_row) {
     while (editor->current_row_completions_begin > 0 &&
-           (editor->completions.items[editor->current_row_completions_begin - 1].row >=
+           (editor->completions.items[editor->current_row_completions_begin].row >
             main_buffer->buffer.cursor_row ||
-            !str_eq(editor->completions.items[editor->current_row_completions_begin - 1].abs_file_path,
+            !str_eq(editor->completions.items[editor->current_row_completions_begin].abs_file_path,
                     main_buffer->abs_file_path)))
       --editor->current_row_completions_begin;
 
-    if (editor->current_row_completions_begin + 1 >= editor->completions.len ||
-        (editor->completions.items[editor->current_row_completions_begin + 1].row >=
-         main_buffer->buffer.cursor_row &&
-         str_eq(editor->completions.items[editor->current_row_completions_begin + 1].abs_file_path,
-                main_buffer->abs_file_path)))
+    if (editor->completions.items[editor->current_row_completions_begin].row <
+        main_buffer->buffer.cursor_row)
       ++editor->current_row_completions_begin;
 
     editor->prev_cursor_row = main_buffer->buffer.cursor_row;
@@ -344,33 +341,41 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
                   param);
         prev_was_before_cursor = false;
       } else if (prev_was_before_cursor) {
+        WideStr word = buffer_get_word_at_cursor(&main_buffer->buffer);
         Completion new_completion = {
           {},
           main_buffer->buffer.cursor_row,
           main_buffer->buffer.cursor_col,
           main_buffer->abs_file_path,
         };
-        new_completion.wsb.len = 1;
+        new_completion.wsb.len = word.len + 1;
         new_completion.wsb.cap = new_completion.wsb.len;
         new_completion.wsb.items =
           malloc(new_completion.wsb.len * sizeof(*new_completion.wsb.items));
-        new_completion.wsb.items[0] = param;
+        memcpy(new_completion.wsb.items,
+               word.ptr,
+               word.len * sizeof(*new_completion.wsb.items));
+        new_completion.wsb.items[word.len] = param;
         DA_INSERT(editor->completions, i, new_completion);
       }
     }
 
     if (line_empty) {
+      WideStr word = buffer_get_word_at_cursor(&main_buffer->buffer);
       Completion new_completion = {
         {},
         main_buffer->buffer.cursor_row,
         main_buffer->buffer.cursor_col,
         main_buffer->abs_file_path,
       };
-      new_completion.wsb.len = 1;
+      new_completion.wsb.len = word.len + 1;
       new_completion.wsb.cap = new_completion.wsb.len;
       new_completion.wsb.items =
         malloc(new_completion.wsb.len * sizeof(*new_completion.wsb.items));
-      new_completion.wsb.items[0] = param;
+      memcpy(new_completion.wsb.items,
+             word.ptr,
+             word.len * sizeof(*new_completion.wsb.items));
+      new_completion.wsb.items[word.len] = param;
       DA_INSERT(editor->completions,
                 editor->current_row_completions_begin,
                 new_completion);

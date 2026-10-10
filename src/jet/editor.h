@@ -70,6 +70,7 @@ struct Editor {
   u32         current_row_completions_begin;
   u32         prev_cursor_row;
   u32         prev_current_main_buffer_index;
+  f32         last_deduplication_time;
 };
 
 MainBuffer    main_buffer_make(char *path);
