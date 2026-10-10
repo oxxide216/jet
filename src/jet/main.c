@@ -687,9 +687,8 @@ i32 main(i32 argc, char **argv) {
           }
         }
 
-        if (editor.actual_completions.len > 0 &&
-            editor.completions_scroll >= editor.actual_completions.len)
-          editor.completions_scroll = editor.actual_completions.len;
+        if (editor.completions_scroll >= editor.actual_completions.len)
+          editor.completions_scroll = 0;
       }
     }
 
