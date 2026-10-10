@@ -26,17 +26,26 @@ typedef enum {
 } JetMode;
 
 typedef struct {
-  u32 row, col, len;
-  Str abs_file_path;
+  WideStringBuilder wsb;
+  u32               row, col;
+  Str               abs_file_path;
 } Completion;
 
 typedef Da(Completion) Completions;
+
+typedef enum {
+  ActionAddLine = 0,
+  ActionRemoveLineBeforeCursor,
+  ActionRemoveLineAfterCursor,
+  ActionAdd,
+  ActionRemoveBeforeCursor,
+  ActionRemoveAfterCursor,
+} Action;
 
 struct Editor {
   MainBuffers main_buffers;
   Buffer      palette_buffer;
   u32         current_main_buffer_index;
-  u32         prev_current_main_buffer_index;
 
   Provider       *provider;
   PaletteOptions  options;
@@ -54,18 +63,13 @@ struct Editor {
   MessageEntries  infos;
   u32             entry_cursor;
 
-  u32 prev_current_main_buffer_rows;
-  u32 prev_current_main_buffer_cursor_row;
-
   bool        completing;
   Completions completions;
   Completions actual_completions;
   u32         completions_scroll;
+  u32         current_row_completions_begin;
   u32         prev_cursor_row;
-  u32         prev_cursor_col;
-  Str         prev_abs_file_path;
-  u32         completion_before_cursor_index;
-  u32         completion_at_cursor_index;
+  u32         prev_current_main_buffer_index;
 };
 
 MainBuffer    main_buffer_make(char *path);
@@ -75,9 +79,12 @@ Buffer       *editor_current_buffer(Editor *editor);
 void          editor_clear_entries(Editor *editor);
 MessageEntry *editor_get_entry(Editor *editor, u32 index);
 void          editor_go_to_entry(Editor *editor, MessageEntry *entry);
-void          editor_build_completions(Editor *editor, u32 main_buffer_index, u32 begin);
-void          editor_update_completion_at_cursor_if_cursor_moved(Editor *editor);
-void          editor_update_completions_on_buffer_change(Editor *editor);
+void          editor_update_inline_errors_before_action(Editor *editor, Action action);
+void          editor_build_completions(Editor *editor, u32 main_buffer_index);
+void          editor_update_current_row_completions_begin(Editor *editor);
+void          editor_update_completions_before_action(Editor *editor,
+                                                      Action action,
+                                                      u32 param);
 void          editor_remove_invalidated_completions(Editor *editor,
                                                     Str invalidated_abs_file_path);
 

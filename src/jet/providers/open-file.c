@@ -51,7 +51,7 @@ static bool execute(Editor *editor, PaletteOptions options, u32 index) {
     buffer_read_file(&main_buffer.buffer, path);
     main_buffer_rebuild_entries(&main_buffer, editor);
     DA_APPEND(editor->main_buffers, main_buffer);
-    editor_build_completions(editor, editor->main_buffers.len - 1, (u32) -1);
+    editor_build_completions(editor, editor->main_buffers.len - 1);
     editor->completing = false;
 
     return true;

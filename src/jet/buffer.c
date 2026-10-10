@@ -289,11 +289,12 @@ void buffer_remove_word_before_cursor(Buffer *buffer) {
     return;
   }
 
-  bool found_word = false;
-
-  if (buffer->cursor_col == 0)
+  if (buffer->cursor_col == 0) {
     buffer_remove_before_cursor(buffer);
+    return;
+  }
 
+  bool found_word = false;
   Line *line = buffer->lines.items + buffer->cursor_row;
   while (buffer->cursor_col > 0 &&
          (!found_word ||
@@ -315,11 +316,13 @@ void buffer_remove_word_at_cursor(Buffer *buffer) {
   }
 
   Line *line = buffer->lines.items + buffer->cursor_row;
-  bool found_word = false;
 
-  if (buffer->cursor_col == line->len)
+  if (buffer->cursor_col == line->len) {
     buffer_remove_at_cursor(buffer);
+    return;
+  }
 
+  bool found_word = false;
   while (buffer->cursor_col < line->len &&
          (!found_word ||
           iswalnum(line->items[buffer->cursor_col]))) {
@@ -594,6 +597,50 @@ WideStr buffer_get_word_before_cursor(Buffer *buffer) {
   while (result.len < line_len &&
          is_part_of_word(result.ptr[result.len]))
     ++result.len;
+
+  return result;
+}
+
+u32 buffer_get_chars_amount_for_remove_word_before_cursor(Buffer *buffer) {
+  bool found_word = false;
+
+  if (buffer->cursor_col == 0)
+    return 1;
+
+  u32 result = 0;
+
+  u32 col = buffer->cursor_col;
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  while (col > 0 &&
+         (!found_word ||
+          iswalnum(line->items[col - 1]))) {
+    if (iswalnum(line->items[col - 1]))
+      found_word = true;
+    --col;
+    ++result;
+  }
+
+  return result;
+}
+
+u32 buffer_get_chars_amount_for_remove_word_at_cursor(Buffer *buffer) {
+  Line *line = buffer->lines.items + buffer->cursor_row;
+
+  if (buffer->cursor_col == line->len)
+    return 1;
+
+  u32 result = 0;
+
+  u32 col = buffer->cursor_col;
+  bool found_word = false;
+  while (col < line->len &&
+         (!found_word ||
+          iswalnum(line->items[col]))) {
+    if (iswalnum(line->items[col]))
+      found_word = true;
+    ++col;
+    ++result;
+  }
 
   return result;
 }

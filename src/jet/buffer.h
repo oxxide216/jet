@@ -54,4 +54,7 @@ u32 buffer_get_rows(Buffer *buffer);
 
 WideStr buffer_get_word_before_cursor(Buffer *buffer);
 
+u32 buffer_get_chars_amount_for_remove_word_before_cursor(Buffer *buffer);
+u32 buffer_get_chars_amount_for_remove_word_at_cursor(Buffer *buffer);
+
 #endif // BUFFER_H

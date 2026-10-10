@@ -130,7 +130,65 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
   }
 }
 
-void editor_build_completions(Editor *editor, u32 main_buffer_index, u32 begin) {
+void editor_update_inline_errors_before_action(Editor *editor, Action action) {
+  MainBuffer *main_buffer =
+    editor->main_buffers.items + editor->current_main_buffer_index;
+
+  if (editor->mode != JetModeEditor ||
+      (main_buffer->errors.len == 0 &&
+       main_buffer->warnings.len == 0 &&
+       main_buffer->infos.len == 0))
+    return;
+
+  MessageEntryPtrs *ptrs[] = {
+    &main_buffer->errors,
+    &main_buffer->warnings,
+    &main_buffer->infos,
+  };
+  u32 rows = buffer_get_rows(&main_buffer->buffer);
+
+  switch (action) {
+  case ActionAddLine: {
+    for (u32 i = 0; i < ARRAY_LEN(ptrs); ++i) {
+      if (ptrs[i]->len < rows + 1)
+        DA_APPEND(*ptrs[i], NULL);
+
+      for (u32 j = ptrs[i]->len; j > main_buffer->buffer.cursor_row + 1; --j) {
+        ptrs[i]->items[j - 1] = ptrs[i]->items[j - 2];
+        ptrs[i]->items[j - 2] = NULL;
+      }
+    }
+  } break;
+
+  case ActionRemoveLineBeforeCursor: {
+    if (main_buffer->buffer.cursor_row > 0) {
+      for (u32 i = 0; i < ARRAY_LEN(ptrs); ++i) {
+        for (u32 j = main_buffer->buffer.cursor_row; j < ptrs[i]->len; ++j) {
+          ptrs[i]->items[j - 1] = ptrs[i]->items[j];
+          ptrs[i]->items[j] = NULL;
+        }
+      }
+    }
+  } break;
+
+  case ActionRemoveLineAfterCursor: {
+    if (main_buffer->buffer.cursor_row + 1 < rows) {
+      for (u32 i = 0; i < ARRAY_LEN(ptrs); ++i) {
+        for (u32 j = main_buffer->buffer.cursor_row + 1; j < ptrs[i]->len; ++j) {
+          ptrs[i]->items[j - 1] = ptrs[i]->items[j];
+          ptrs[i]->items[j] = NULL;
+        }
+      }
+    }
+  } break;
+
+  case ActionAdd:                break;
+  case ActionRemoveBeforeCursor: break;
+  case ActionRemoveAfterCursor:  break;
+  }
+}
+
+void editor_build_completions(Editor *editor, u32 main_buffer_index) {
   MainBuffer *main_buffer = editor->main_buffers.items + main_buffer_index;
 
   u32 rows = buffer_get_rows(&main_buffer->buffer);
@@ -147,18 +205,14 @@ void editor_build_completions(Editor *editor, u32 main_buffer_index, u32 begin) 
       } else {
         if (found_word) {
           if (j - anchor >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
-            Completion completion = { i, anchor, j - anchor, main_buffer->abs_file_path };
-            if (begin == (u32) -1) {
-              DA_APPEND(editor->completions, completion);
-            } else {
-              if (begin < editor->completions.len &&
-                  str_eq(editor->completions.items[begin].abs_file_path,
-                         main_buffer->abs_file_path))
-                editor->completions.items[begin] = completion;
-              else
-                DA_INSERT(editor->completions, begin, completion);
-              ++begin;
-            }
+            Completion new_completion = { {}, i, anchor, main_buffer->abs_file_path };
+            new_completion.wsb.len = j - anchor;
+            new_completion.wsb.cap = new_completion.wsb.len;
+            new_completion.wsb.items =
+              malloc(new_completion.wsb.len * sizeof(*new_completion.wsb.items));
+            memcpy(new_completion.wsb.items, line.ptr + anchor,
+                   new_completion.wsb.len * sizeof(*new_completion.wsb.items));
+            DA_APPEND(editor->completions, new_completion);
           }
           found_word = false;
         }
@@ -166,90 +220,228 @@ void editor_build_completions(Editor *editor, u32 main_buffer_index, u32 begin) 
     }
 
     if (found_word && line.len > anchor) {
-      Completion completion = { i, anchor, line.len - anchor, main_buffer->abs_file_path };
-      if (begin == (u32) -1) {
-        DA_APPEND(editor->completions, completion);
-      } else {
-        if (begin < editor->completions.len &&
-            str_eq(editor->completions.items[begin].abs_file_path,
-                   main_buffer->abs_file_path))
-          editor->completions.items[begin] = completion;
-        else
-          DA_INSERT(editor->completions, begin, completion);
-        ++begin;
-      }
+      Completion new_completion = { {}, i, anchor, main_buffer->abs_file_path };
+      new_completion.wsb.len = line.len - anchor;
+      new_completion.wsb.cap = new_completion.wsb.len;
+      new_completion.wsb.items =
+        malloc(new_completion.wsb.len * sizeof(*new_completion.wsb.items));
+      memcpy(new_completion.wsb.items, line.ptr + anchor,
+             new_completion.wsb.len * sizeof(*new_completion.wsb.items));
+      DA_APPEND(editor->completions, new_completion);
     }
   }
 }
 
-void editor_update_completion_at_cursor_if_cursor_moved(Editor *editor) {
-  MainBuffer *main_buffer = editor->main_buffers.items + editor->current_main_buffer_index;
-  Buffer *buffer = &main_buffer->buffer;
-
-  bool is_path_same = str_eq(editor->prev_abs_file_path, main_buffer->abs_file_path);
-
-  if (editor->prev_cursor_row == buffer->cursor_row &&
-      editor->prev_cursor_col == buffer->cursor_col &&
-      is_path_same)
+void editor_update_current_row_completions_begin(Editor *editor) {
+  if (!editor->completing)
     return;
 
-  u32 begin =
-    (editor->completion_at_cursor_index == (u32) -1 ||
-     !is_path_same ||
-     editor->prev_cursor_row > buffer->cursor_row ||
-     (editor->prev_cursor_row == buffer->cursor_row &&
-      editor->prev_cursor_col > buffer->cursor_col)) ?
-    0 :
-    editor->completion_at_cursor_index;
+  MainBuffer *main_buffer =
+    editor->main_buffers.items + editor->current_main_buffer_index;
 
-  editor->completion_at_cursor_index = (u32) -1;
+  if (editor->prev_current_main_buffer_index !=
+      editor->current_main_buffer_index) {
+    editor->current_row_completions_begin = 0;
+    while (editor->current_row_completions_begin < editor->completions.len &&
+           (editor->completions.items[editor->current_row_completions_begin].row <
+            main_buffer->buffer.cursor_row ||
+            !str_eq(editor->completions.items[editor->current_row_completions_begin].abs_file_path,
+                    main_buffer->abs_file_path)))
+      ++editor->current_row_completions_begin;
 
-  for (u32 i = begin; i < editor->completions.len; ++i) {
-    Completion *completion = editor->completions.items + i;
-    if (str_eq(main_buffer->abs_file_path, completion->abs_file_path)) {
-      if (buffer->cursor_row == completion->row &&
-          buffer->cursor_col >= completion->col &&
-          buffer->cursor_col <= completion->col + completion->len) {
-        editor->completion_at_cursor_index = i;
-        break;
-      } else if (buffer->cursor_row > completion->row ||
-                 (buffer->cursor_row == completion->row &&
-                  buffer->cursor_col > completion->col)) {
-        editor->completion_before_cursor_index = i;
-      }
-    }
+    editor->prev_current_main_buffer_index = editor->current_main_buffer_index;
+    editor->prev_cursor_row = main_buffer->buffer.cursor_row;
+
+    return;
   }
 
-  editor->prev_cursor_row = buffer->cursor_row;
-  editor->prev_cursor_col = buffer->cursor_col;
-  editor->prev_abs_file_path = main_buffer->abs_file_path;
+  if (editor->prev_cursor_row < main_buffer->buffer.cursor_row) {
+    while (editor->current_row_completions_begin < editor->completions.len &&
+           (editor->completions.items[editor->current_row_completions_begin].row <
+            main_buffer->buffer.cursor_row ||
+            !str_eq(editor->completions.items[editor->current_row_completions_begin].abs_file_path,
+                    main_buffer->abs_file_path)))
+      ++editor->current_row_completions_begin;
+
+    editor->prev_cursor_row = main_buffer->buffer.cursor_row;
+  } else if (editor->prev_cursor_row > main_buffer->buffer.cursor_row) {
+    while (editor->current_row_completions_begin > 0 &&
+           (editor->completions.items[editor->current_row_completions_begin - 1].row >=
+            main_buffer->buffer.cursor_row ||
+            !str_eq(editor->completions.items[editor->current_row_completions_begin - 1].abs_file_path,
+                    main_buffer->abs_file_path)))
+      --editor->current_row_completions_begin;
+
+    if (editor->current_row_completions_begin + 1 >= editor->completions.len ||
+        (editor->completions.items[editor->current_row_completions_begin + 1].row >=
+         main_buffer->buffer.cursor_row &&
+         str_eq(editor->completions.items[editor->current_row_completions_begin + 1].abs_file_path,
+                main_buffer->abs_file_path)))
+      ++editor->current_row_completions_begin;
+
+    editor->prev_cursor_row = main_buffer->buffer.cursor_row;
+  }
 }
 
-void editor_update_completions_on_buffer_change(Editor *editor) {
-  MainBuffer *main_buffer = editor->main_buffers.items + editor->current_main_buffer_index;
+void editor_update_completions_before_action(Editor *editor, Action action, u32 param) {
+  MainBuffer *main_buffer =
+    editor->main_buffers.items + editor->current_main_buffer_index;
+  u32 rows = buffer_get_rows(&main_buffer->buffer);
 
-  editor_update_completion_at_cursor_if_cursor_moved(editor);
-
-  u32 begin = (u32) -1;
-  for (u32 i = 0; i < editor->completions.len; ++i) {
-    if (str_eq(editor->completions.items[i].abs_file_path, main_buffer->abs_file_path)) {
-      begin = i;
-      break;
+  switch (action) {
+  case ActionAddLine: {
+    for (u32 i = editor->current_row_completions_begin; i < editor->completions.len; ++i) {
+      Completion *completion = editor->completions.items + i;
+      if (!str_eq(completion->abs_file_path, main_buffer->abs_file_path))
+        break;
+      if (completion->col >= main_buffer->buffer.cursor_col)
+        ++completion->row;
     }
-  }
+  } break;
 
-  if (begin != (u32) -1)
-    editor_build_completions(editor, editor->current_main_buffer_index, begin);
+  case ActionRemoveLineBeforeCursor: {
+    if (main_buffer->buffer.cursor_row > 0) {
+      for (u32 i = editor->current_row_completions_begin; i < editor->completions.len; ++i) {
+        Completion *completion = editor->completions.items + i;
+        if (!str_eq(completion->abs_file_path, main_buffer->abs_file_path))
+          break;
+        if (completion->col >= main_buffer->buffer.cursor_col)
+          ++completion->row;
+      }
+    }
+  } break;
+
+  case ActionRemoveLineAfterCursor: {
+    if (main_buffer->buffer.cursor_row + 1 < rows) {
+      for (u32 i = editor->current_row_completions_begin; i < editor->completions.len; ++i) {
+        Completion *completion = editor->completions.items + i;
+        if (!str_eq(completion->abs_file_path, main_buffer->abs_file_path))
+          break;
+        if (completion->row > main_buffer->buffer.cursor_row)
+          ++completion->row;
+      }
+    }
+  } break;
+
+  case ActionAdd: {
+    if (!is_part_of_word(param))
+      break;
+
+    bool prev_was_before_cursor = false;
+    bool line_empty = true;
+    for (u32 i = editor->current_row_completions_begin; i < editor->completions.len; ++i) {
+      Completion *completion = editor->completions.items + i;
+      if (!str_eq(completion->abs_file_path, main_buffer->abs_file_path) ||
+          completion->row > main_buffer->buffer.cursor_row)
+        break;
+      line_empty = false;
+      if (completion->col > main_buffer->buffer.cursor_col) {
+        ++completion->col;
+        prev_was_before_cursor = true;
+      } else if (completion->col + completion->wsb.len >= main_buffer->buffer.cursor_col) {
+        DA_INSERT(completion->wsb,
+                  main_buffer->buffer.cursor_col - completion->col,
+                  param);
+        prev_was_before_cursor = false;
+      } else if (prev_was_before_cursor) {
+        Completion new_completion = {
+          {},
+          main_buffer->buffer.cursor_row,
+          main_buffer->buffer.cursor_col,
+          main_buffer->abs_file_path,
+        };
+        new_completion.wsb.len = 1;
+        new_completion.wsb.cap = new_completion.wsb.len;
+        new_completion.wsb.items =
+          malloc(new_completion.wsb.len * sizeof(*new_completion.wsb.items));
+        new_completion.wsb.items[0] = param;
+        DA_INSERT(editor->completions, i, new_completion);
+      }
+    }
+
+    if (line_empty) {
+      Completion new_completion = {
+        {},
+        main_buffer->buffer.cursor_row,
+        main_buffer->buffer.cursor_col,
+        main_buffer->abs_file_path,
+      };
+      new_completion.wsb.len = 1;
+      new_completion.wsb.cap = new_completion.wsb.len;
+      new_completion.wsb.items =
+        malloc(new_completion.wsb.len * sizeof(*new_completion.wsb.items));
+      new_completion.wsb.items[0] = param;
+      DA_INSERT(editor->completions,
+                editor->current_row_completions_begin,
+                new_completion);
+    }
+  } break;
+
+  case ActionRemoveBeforeCursor: {
+    if (main_buffer->buffer.cursor_col > 0) {
+      for (u32 i = editor->current_row_completions_begin; i < editor->completions.len; ++i) {
+        Completion *completion = editor->completions.items + i;
+        if (!str_eq(completion->abs_file_path, main_buffer->abs_file_path) ||
+            completion->row > main_buffer->buffer.cursor_row)
+          break;
+        if (completion->col >= main_buffer->buffer.cursor_col) {
+          completion->col -= param;
+        } else if (completion->col <=
+                   main_buffer->buffer.cursor_col &&
+                   completion->col + completion->wsb.len >=
+                   main_buffer->buffer.cursor_col - param) {
+          for (u32 j = 0; j < param; ++j) {
+            if (completion->wsb.len <
+                main_buffer->buffer.cursor_col - completion->col - param)
+              break;
+            DA_REMOVE_AT(completion->wsb,
+                         main_buffer->buffer.cursor_col - completion->col - param);
+          }
+
+          if (completion->wsb.len == 0) {
+            free(editor->completions.items[i].wsb.items);
+            DA_REMOVE_AT(editor->completions, i);
+            --i;
+          }
+        }
+      }
+    }
+  } break;
+
+  case ActionRemoveAfterCursor: {
+      for (u32 i = editor->current_row_completions_begin; i < editor->completions.len; ++i) {
+        Completion *completion = editor->completions.items + i;
+        if (!str_eq(completion->abs_file_path, main_buffer->abs_file_path) ||
+            completion->row > main_buffer->buffer.cursor_row)
+          break;
+        if (completion->col >= main_buffer->buffer.cursor_col + param) {
+          completion->col -= param;
+        } else if (completion->col + completion->wsb.len >
+                   main_buffer->buffer.cursor_col &&
+                   completion->col <
+                   main_buffer->buffer.cursor_col + param) {
+          for (u32 j = 0; j < param; ++j)
+            if (completion->wsb.len >
+                main_buffer->buffer.cursor_col - completion->col)
+              DA_REMOVE_AT(completion->wsb,
+                           main_buffer->buffer.cursor_col - completion->col);
+
+          if (completion->wsb.len == 0) {
+            free(editor->completions.items[i].wsb.items);
+            DA_REMOVE_AT(editor->completions, i);
+            --i;
+          }
+        }
+      }
+  } break;
+  }
 }
 
 void editor_remove_invalidated_completions(Editor *editor, Str invalidated_abs_file_path) {
   for (u32 i = editor->completions.len; i > 0; --i) {
     Completion *completion = editor->completions.items + i - 1;
     if (str_eq(completion->abs_file_path, invalidated_abs_file_path)) {
-      if (i - 1 == editor->completion_at_cursor_index)
-        editor->completion_at_cursor_index = (u32) -1;
-      else if (i - 1 < editor->completion_at_cursor_index)
-        --editor->completion_at_cursor_index;
+      free(completion->wsb.items);
       DA_REMOVE_AT(editor->completions, i - 1);
     }
   }

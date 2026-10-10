@@ -178,13 +178,11 @@ i32 main(i32 argc, char **argv) {
   editor.palette_buffer = buffer_make();
   editor.mode = JetModeEditor;
   editor.font_scale = DEFAULT_FONT_SCALE;
-  editor.completion_before_cursor_index = (u32) -1;
-  editor.completion_at_cursor_index = (u32) -1;
 
   if (argc > 1) {
     buffer_read_file(editor_current_buffer(&editor), argv[1]);
     editor.main_buffers.items[0].file_path = strdup(argv[1]);
-    editor_build_completions(&editor, 0, (u32) -1);
+    editor_build_completions(&editor, 0);
 
     for (u32 i = 2; i < (u32) argc; ++i) {
       MainBuffer main_buffer = main_buffer_make(NULL);
@@ -226,43 +224,6 @@ i32 main(i32 argc, char **argv) {
     WARN("Failed to create server: %s\n", cns_get_error_str(cns_error));
 
   while (is_running) {
-    // Update actual completions
-    if (editor.completing) {
-      WideStr word = buffer_get_word_before_cursor(&CURRENT_BUFFER());
-      if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
-        editor.actual_completions.len = 0;
-        for (u32 i = 0; i < editor.completions.len; ++i) {
-          Completion *completion = editor.completions.items + i;
-          if (!str_eq(completion->abs_file_path, CURRENT_ABS_FILE_PATH()))
-            continue;
-          WideStr line = buffer_get_line(&CURRENT_BUFFER(), completion->row);
-          if (completion->col + completion->len > line.len)
-            continue;
-          WideStr completion_wstr = { line.ptr + completion->col, completion->len };
-          if (wide_str_begins_with(completion_wstr, word) &&
-              completion_wstr.len > word.len) {
-            bool already_exists = false;
-            for (u32 j = 0; j < editor.actual_completions.len; ++j) {
-              Completion *actual_completion = editor.actual_completions.items + j;
-              WideStr line = buffer_get_line(&CURRENT_BUFFER(), actual_completion->row);
-              WideStr actual_completion_wstr =
-                { line.ptr + actual_completion->col, actual_completion->len };
-              if (wide_str_eq(actual_completion_wstr, completion_wstr)) {
-                already_exists = true;
-                break;
-              }
-            }
-            if (!already_exists)
-              DA_APPEND(editor.actual_completions, *completion);
-          }
-        }
-
-        if (editor.actual_completions.len > 0 &&
-            editor.completions_scroll >= editor.actual_completions.len)
-          editor.completions_scroll = editor.actual_completions.len;
-      }
-    }
-
     WinxEvent event;
     while ((event = winx_get_event(window, false)).kind != WinxEventKindNone) {
       is_running &= event.kind != WinxEventKindQuit;
@@ -301,22 +262,18 @@ i32 main(i32 argc, char **argv) {
                 WideStr word = buffer_get_word_before_cursor(&CURRENT_BUFFER());
                 Completion *completion =
                   editor.actual_completions.items + editor.completions_scroll;
-                WideStr completion_line =
-                  buffer_get_line(&CURRENT_BUFFER(), completion->row);
                 while (CURRENT_BUFFER().cursor_col < line.len &&
                        is_part_of_word(line.ptr[CURRENT_BUFFER().cursor_col]))
                   ++CURRENT_BUFFER().cursor_col;
                 for (u32 i = 0; i < word.len; ++i)
                   buffer_remove_before_cursor(&CURRENT_BUFFER());
-                for (u32 i = 0; i < completion->len; ++i)
-                  buffer_insert(&CURRENT_BUFFER(),
-                                completion_line.ptr[completion->col + i]);
+                for (u32 i = 0; i < completion->wsb.len; ++i)
+                  buffer_insert(&CURRENT_BUFFER(), completion->wsb.items[i]);
                 editor.completing = false;
               } else {
+                editor_update_inline_errors_before_action(&editor, ActionAddLine);
+                editor_update_completions_before_action(&editor, ActionAddLine, 0);
                 buffer_insert_new_line(&CURRENT_BUFFER());
-
-                if (editor.completing)
-                  editor_update_completions_on_buffer_change(&editor);
               }
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
@@ -365,23 +322,50 @@ i32 main(i32 argc, char **argv) {
         } break;
 
         case WinxKeyCodeBackspace: {
+          if (CURRENT_BUFFER().cursor_col == 0) {
+            editor_update_inline_errors_before_action(&editor, ActionRemoveLineBeforeCursor);
+            editor_update_completions_before_action(&editor, ActionRemoveLineBeforeCursor, 0);
+          } else {
+            u32 amount;
+            if (is_ctrl_pressed)
+              amount =
+                buffer_get_chars_amount_for_remove_word_before_cursor(&CURRENT_BUFFER());
+            else
+              amount = 1;
+
+            editor_update_inline_errors_before_action(&editor, ActionRemoveBeforeCursor);
+            editor_update_completions_before_action(&editor, ActionRemoveBeforeCursor, amount);
+          }
+
           if (is_ctrl_pressed)
             buffer_remove_word_before_cursor(editor_current_buffer(&editor));
           else
             buffer_remove_before_cursor(editor_current_buffer(&editor));
 
-          if (editor.completing)
-            editor_update_completions_on_buffer_change(&editor);
+          editor_update_current_row_completions_begin(&editor);
         } break;
 
         case WinxKeyCodeDelete: {
+          WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
+          if (CURRENT_BUFFER().cursor_col == line.len) {
+            editor_update_inline_errors_before_action(&editor, ActionRemoveLineAfterCursor);
+            editor_update_completions_before_action(&editor, ActionRemoveLineAfterCursor, 0);
+          } else {
+            u32 amount;
+            if (is_ctrl_pressed)
+              amount =
+                buffer_get_chars_amount_for_remove_word_at_cursor(&CURRENT_BUFFER());
+            else
+              amount = 1;
+
+            editor_update_inline_errors_before_action(&editor, ActionRemoveAfterCursor);
+            editor_update_completions_before_action(&editor, ActionRemoveAfterCursor, amount);
+          }
+
           if (is_ctrl_pressed)
             buffer_remove_word_at_cursor(editor_current_buffer(&editor));
           else
             buffer_remove_at_cursor(editor_current_buffer(&editor));
-
-          if (editor.completing)
-            editor_update_completions_on_buffer_change(&editor);
         } break;
 
         case WinxKeyCodeLeft: {
@@ -520,6 +504,7 @@ i32 main(i32 argc, char **argv) {
               editor.provider = &command_provider;
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
+              editor.completing = false;
               buffer_remove_line(editor_current_buffer(&editor));
             } else if (editor.mode == JetModeCommandPalette) {
               editor.mode = JetModeEditor;
@@ -547,6 +532,7 @@ i32 main(i32 argc, char **argv) {
               editor.provider = &error_provider;
               editor.selected_option = editor.entry_cursor;
               editor.mode = JetModeCommandPalette;
+              editor.completing = false;
               buffer_remove_line(editor_current_buffer(&editor));
             } else if (editor.mode == JetModeCommandPalette) {
               editor.mode = JetModeEditor;
@@ -559,6 +545,7 @@ i32 main(i32 argc, char **argv) {
             editor.provider = &open_file_provider;
             editor.selected_option = 0;
             editor.mode = JetModeCommandPalette;
+            editor.completing = false;
             buffer_remove_line(editor_current_buffer(&editor));
           }
         } break;
@@ -569,6 +556,7 @@ i32 main(i32 argc, char **argv) {
               editor.provider = &save_file_provider;
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
+              editor.completing = false;
               buffer_remove_line(editor_current_buffer(&editor));
             } else {
               buffer_write_file(editor_current_buffer(&editor), CURRENT_FILE_PATH());
@@ -650,14 +638,18 @@ i32 main(i32 argc, char **argv) {
 
       case WinxEventKindChar: {
         if (!is_ctrl_pressed && !is_alt_pressed) {
+          editor_update_inline_errors_before_action(&editor, ActionAdd);
+          editor_update_completions_before_action(&editor, ActionAdd,
+                                                  event.as._char._char);
+
           buffer_insert(editor_current_buffer(&editor), event.as._char._char);
 #if AUTOCOMPLETION
-          if (!editor.completing)
-            editor.completions_scroll = 0;
-          editor.completing = true;
+          if (editor.mode == JetModeEditor) {
+            if (!editor.completing)
+              editor.completions_scroll = 0;
+            editor.completing = true;
+          }
 #endif
-          if (editor.completing)
-            editor_update_completions_on_buffer_change(&editor);
         }
       } break;
 
@@ -665,53 +657,46 @@ i32 main(i32 argc, char **argv) {
       }
     }
 
-    if (editor.completing)
-      editor_update_completion_at_cursor_if_cursor_moved(&editor);
+    editor_update_current_row_completions_begin(&editor);
 
-    // Handle document changes to correctly display inline errors
-    if (editor.mode == JetModeEditor &&
-        (CURRENT_ERRORS().len > 0 ||
-         CURRENT_WARNINGS().len > 0 ||
-         CURRENT_INFOS().len > 0)) {
-      u32 current_main_buffer_rows = buffer_get_rows(&CURRENT_BUFFER());
-      if (editor.prev_current_main_buffer_index != editor.current_main_buffer_index) {
-        editor.prev_current_main_buffer_index = editor.current_main_buffer_index;
-        editor.prev_current_main_buffer_rows = buffer_get_rows(&CURRENT_BUFFER());
-      } else {
-        MessageEntryPtrs *ptrs[] = {
-          &CURRENT_ERRORS(),
-          &CURRENT_WARNINGS(),
-          &CURRENT_INFOS(),
-        };
+    if (CURRENT_BUFFER().is_selecting)
+      editor.completing = false;
 
-        if (editor.prev_current_main_buffer_rows > current_main_buffer_rows) {
-          // Removed lines
-          u32 diff = editor.prev_current_main_buffer_rows - current_main_buffer_rows;
-          for (u32 i = 0; i < ARRAY_LEN(ptrs); ++i) {
-            for (u32 j = CURRENT_BUFFER().cursor_row + diff; j < ptrs[i]->len; ++j) {
-              ptrs[i]->items[j - diff] = ptrs[i]->items[j];
-              if (j > editor.prev_current_main_buffer_cursor_row + diff + 1)
-                ptrs[i]->items[j] = NULL;
+    // Update actual completions
+    if (editor.completing) {
+      WideStr word = buffer_get_word_before_cursor(&CURRENT_BUFFER());
+      if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
+        editor.actual_completions.len = 0;
+        for (u32 i = 0; i < editor.completions.len; ++i) {
+          Completion *completion = editor.completions.items + i;
+          if (!str_eq(completion->abs_file_path, CURRENT_ABS_FILE_PATH()))
+            continue;
+          WideStr line = buffer_get_line(&CURRENT_BUFFER(), completion->row);
+          if (completion->col + completion->wsb.len > line.len)
+            continue;
+          WideStr completion_wstr = { completion->wsb.items, completion->wsb.len };
+          if (wide_str_begins_with(completion_wstr, word) &&
+              completion_wstr.len > word.len) {
+            bool already_exists = false;
+            for (u32 j = 0; j < editor.actual_completions.len; ++j) {
+              Completion *actual_completion = editor.actual_completions.items + j;
+              WideStr actual_completion_wstr =
+                { actual_completion->wsb.items, actual_completion->wsb.len };
+              if (wide_str_eq(actual_completion_wstr, completion_wstr)) {
+                already_exists = true;
+                break;
+              }
             }
+            if (!already_exists)
+              DA_APPEND(editor.actual_completions, *completion);
           }
-          editor.prev_current_main_buffer_rows = current_main_buffer_rows;
-        } else if (editor.prev_current_main_buffer_rows < current_main_buffer_rows) {
-          // Added lines
-          u32 diff = current_main_buffer_rows - editor.prev_current_main_buffer_rows;
-          for (u32 i = 0; i < ARRAY_LEN(ptrs); ++i) {
-            while (ptrs[i]->len < current_main_buffer_rows)
-              DA_APPEND(*ptrs[i], NULL);
-
-            for (u32 j = ptrs[i]->len; j > CURRENT_BUFFER().cursor_row + diff - 1; --j) {
-              ptrs[i]->items[j - 1] = ptrs[i]->items[j - 1 - diff];
-              ptrs[i]->items[j - 1 - diff] = NULL;
-            }
-          }
-          editor.prev_current_main_buffer_rows = current_main_buffer_rows;
         }
+
+        if (editor.actual_completions.len > 0 &&
+            editor.completions_scroll >= editor.actual_completions.len)
+          editor.completions_scroll = editor.actual_completions.len;
       }
     }
-    editor.prev_current_main_buffer_cursor_row = CURRENT_BUFFER().cursor_row;
 
     cns_step(cns, 1);
 
@@ -867,8 +852,7 @@ i32 main(i32 argc, char **argv) {
                  i < editor.actual_completions.len && y <= y_limit;
                  ++i) {
               Completion *completion = editor.actual_completions.items + i;
-              WideStr line = buffer_get_line(&CURRENT_BUFFER(), completion->row);
-              tr_draw_text(&ptr, line.ptr + completion->col, completion->len, x, y);
+              tr_draw_text(&ptr, completion->wsb.items, completion->wsb.len, x, y);
               y += (f32) editor.font_scale;
 
               if (i == editor.completions_scroll) {
@@ -1088,6 +1072,8 @@ i32 main(i32 argc, char **argv) {
 
   cns_destroy(cns);
 
+  for (u32 i = 0; i < editor.completions.len; ++i)
+    free(editor.completions.items[i].wsb.items);
   if (editor.completions.items)
     free(editor.completions.items);
   if (editor.actual_completions.items)
