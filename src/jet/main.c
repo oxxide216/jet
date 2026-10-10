@@ -669,11 +669,6 @@ i32 main(i32 argc, char **argv) {
         editor.actual_completions.len = 0;
         for (u32 i = 0; i < editor.completions.len; ++i) {
           Completion *completion = editor.completions.items + i;
-          if (!str_eq(completion->abs_file_path, CURRENT_ABS_FILE_PATH()))
-            continue;
-          WideStr line = buffer_get_line(&CURRENT_BUFFER(), completion->row);
-          if (completion->col + completion->wsb.len > line.len)
-            continue;
           WideStr completion_wstr = { completion->wsb.items, completion->wsb.len };
           if (wide_str_begins_with(completion_wstr, word) &&
               completion_wstr.len > word.len) {
