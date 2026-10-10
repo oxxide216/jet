@@ -39,7 +39,7 @@ struct Editor {
 
   JetMode mode;
 
-  f32 font_scale;
+  u32 font_scale;
 
   CnsConnection  *jwrap;
   MessageEntries  errors;

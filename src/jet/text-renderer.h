@@ -4,10 +4,10 @@
 #include "winx/winx.h"
 #include "viking/viking.h"
 #include "stb_truetype.h"
+#include "config.h"
 
 typedef struct {
   u32 _char;
-  f32 scale;
   f32 x_offset;
   f32 y_offset;
   f32 w, h;
@@ -19,7 +19,7 @@ typedef Da(Glyph) Glyphs;
 
 typedef struct {
   stbtt_fontinfo  font;
-  Glyphs          glyphs_cache;
+  Glyphs          glyphs_cache[MAX_FONT_SCALE - MIN_FONT_SCALE + 1];
   u8             *data;
   u32             cursor_x;
   VikInstance    *instance;
@@ -73,7 +73,7 @@ typedef struct {
   f32             bg_r, bg_g, bg_b;
   f32             fg_r, fg_g, fg_b;
   f32             sel_r, sel_g, sel_b;
-  f32             scale;
+  u32             scale;
   u32             sel_begin_row;
   u32             sel_begin_col;
   u32             sel_end_row;
@@ -98,7 +98,7 @@ TextRenderer tr_make(WinxWindow *window,
                      Str sel_vert_bc,
                      Str sel_frag_bc);
 void         tr_resize(TextRenderer *tr, f32 width, f32 height);
-void         tr_begin_frame(TextRenderer *tr, f32 scale,
+void         tr_begin_frame(TextRenderer *tr, u32 scale,
                             u32 sel_begin_row, u32 sel_begin_col,
                             u32 sel_end_row, u32 sel_end_col);
 void         tr_set_bg_color(TextRenderer *tr, f32 r, f32 g, f32 b);

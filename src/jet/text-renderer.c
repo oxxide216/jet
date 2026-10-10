@@ -51,8 +51,9 @@ void atlas_ensure_is_actual(Atlas *atlas) {
 void atlas_delete(Atlas *atlas) {
   vik_delete_image(atlas->image);
   free(atlas->data);
-  if (atlas->glyphs_cache.items)
-    free(atlas->glyphs_cache.items);
+  for (u32 i = 0; i < ARRAY_LEN(atlas->glyphs_cache); ++i)
+    if (atlas->glyphs_cache[i].items)
+      free(atlas->glyphs_cache[i].items);
 }
 
 TextRenderer tr_make(WinxWindow *window,
@@ -102,7 +103,7 @@ void tr_resize(TextRenderer *tr, f32 width, f32 height) {
   tr->is_ubo_data_dirty = true;
 }
 
-void tr_begin_frame(TextRenderer *tr, f32 scale,
+void tr_begin_frame(TextRenderer *tr, u32 scale,
                     u32 sel_begin_row, u32 sel_begin_col,
                     u32 sel_end_row, u32 sel_end_col) {
   tr->text_ssbo_data.len = 0;
@@ -119,14 +120,14 @@ void tr_begin_frame(TextRenderer *tr, f32 scale,
   tr->line_index = 0;
 }
 
-static void get_char_data(Atlas *atlas, u32 _char, f32 scale,
+static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
                           f32 *out_x, f32 *out_y,
                           f32 *out_width, f32 *out_height,
                           f32 *out_tl_u, f32 *out_tl_v,
                           f32 *out_br_u, f32 *out_br_v) {
-  for (u32 i = 0; i < atlas->glyphs_cache.len; ++i) {
-    Glyph *glyph = atlas->glyphs_cache.items + i;
-    if (glyph->_char == _char && glyph->scale == scale) {
+  for (u32 i = 0; i < atlas->glyphs_cache[scale - MIN_FONT_SCALE].len; ++i) {
+    Glyph *glyph = atlas->glyphs_cache[scale - MIN_FONT_SCALE].items + i;
+    if (glyph->_char == _char) {
       if (out_x)
         *out_x += glyph->x_offset;
       if (out_y)
@@ -158,7 +159,7 @@ static void get_char_data(Atlas *atlas, u32 _char, f32 scale,
 
     memset(atlas->data, 0, ATLAS_WIDTH * ATLAS_HEIGHT * sizeof(*atlas->data));
 
-    atlas->glyphs_cache.len = 0;
+    atlas->glyphs_cache[scale - MIN_FONT_SCALE].len = 0;
   }
 
   // If this fails, increase atlas size
@@ -198,13 +199,12 @@ static void get_char_data(Atlas *atlas, u32 _char, f32 scale,
 
   Glyph glyph = {
     _char,
-    scale,
     x_offset, y_offset,
     o_width, o_height,
     o_tl_u, o_tl_v,
     o_br_u, o_br_v,
   };
-  DA_APPEND(atlas->glyphs_cache, glyph);
+  DA_APPEND(atlas->glyphs_cache[scale - MIN_FONT_SCALE], glyph);
   atlas->is_glyphs_cache_dirty = true;
 
   if (out_x)

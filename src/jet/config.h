@@ -6,9 +6,9 @@
 #define NEW_FILE_NAME    U"<New file>"
 #define LINE_WRAP_MARKER U"→"
 
-#define MAX_FONT_SCALE     240.0
-#define MIN_FONT_SCALE     8.0
-#define DEFAULT_FONT_SCALE 24.0
+#define MAX_FONT_SCALE     240
+#define MIN_FONT_SCALE     8
+#define DEFAULT_FONT_SCALE 24
 
 #define BUFFER_PADDING        10.0
 #define PALETTE_WIDTH_FACTOR  0.8

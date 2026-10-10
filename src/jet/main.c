@@ -399,12 +399,12 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeEqual: {
           if (is_ctrl_pressed && editor.font_scale < MAX_FONT_SCALE)
-            editor.font_scale += 1.0;
+            ++editor.font_scale;
         } break;
 
         case WinxKeyCodeMinus: {
           if (is_ctrl_pressed && editor.font_scale > MIN_FONT_SCALE)
-            editor.font_scale -= 1.0;
+            --editor.font_scale;
         } break;
 
         case WinxKeyCodeP: {
@@ -638,7 +638,7 @@ i32 main(i32 argc, char **argv) {
                                  BUFFER_PADDING, y,
                                  window->width - BUFFER_PADDING * 2.0,
                                  &x);
-        if (new_y >= window->height - editor.font_scale - BUFFER_PADDING * 3.0)
+        if (new_y >= window->height - (f32) editor.font_scale - BUFFER_PADDING * 3.0)
           break;
         y = new_y;
         ++visible_lines;
@@ -652,7 +652,7 @@ i32 main(i32 argc, char **argv) {
           tr_set_fg_color(&tr, ERROR_COLOR);
           tr_draw_text(&tr, text,
                        message->len, x + space_width * INLINE_ERROR_OFFSET_MULTIPLIER,
-                       new_y - editor.font_scale);
+                       new_y - (f32) editor.font_scale);
           tr_set_fg_color(&tr, FG_COLOR);
           free(text);
         } else if (i < CURRENT_WARNINGS().len && CURRENT_WARNINGS().items[i]) {
@@ -663,7 +663,7 @@ i32 main(i32 argc, char **argv) {
           tr_set_fg_color(&tr, WARN_COLOR);
           tr_draw_text(&tr, text,
                        message->len, x + space_width * INLINE_ERROR_OFFSET_MULTIPLIER,
-                       new_y - editor.font_scale);
+                       new_y - (f32) editor.font_scale);
           tr_set_fg_color(&tr, FG_COLOR);
           free(text);
         } else if (i < CURRENT_INFOS().len && CURRENT_INFOS().items[i]) {
@@ -674,7 +674,7 @@ i32 main(i32 argc, char **argv) {
           tr_set_fg_color(&tr, INFO_COLOR);
           tr_draw_text(&tr, text,
                        message->len, x + space_width * INLINE_ERROR_OFFSET_MULTIPLIER,
-                       new_y - editor.font_scale);
+                       new_y - (f32) editor.font_scale);
           tr_set_fg_color(&tr, FG_COLOR);
           free(text);
         }
@@ -726,7 +726,7 @@ i32 main(i32 argc, char **argv) {
       // Separator
       sr_draw_rect(&sr,
                    window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
-                   window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 2.0 + PALETTE_BORDER_WIDTH + editor.font_scale,
+                   window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 2.0 + PALETTE_BORDER_WIDTH + (f32) editor.font_scale,
                    window->width * PALETTE_WIDTH_FACTOR,
                    PALETTE_BORDER_WIDTH,
                    FG_COLOR, PALETTE_ALPHA);
@@ -772,9 +772,9 @@ i32 main(i32 argc, char **argv) {
       for (u32 i = editor.palette_scroll_y; i < editor.options.len; ++i) {
         PaletteOption *option = editor.options.items + i;
         f32 x = window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH;
-        f32 y = window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 3.0 + PALETTE_BORDER_WIDTH + editor.font_scale * (i + 1);
+        f32 y = window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 3.0 + PALETTE_BORDER_WIDTH + (f32) editor.font_scale * (i + 1);
 
-        if (window->height - y - editor.font_scale < window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH)
+        if (window->height - y - (f32) editor.font_scale < window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH)
           break;
 
         if (i == editor.selected_option) {
@@ -785,7 +785,7 @@ i32 main(i32 argc, char **argv) {
                        window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
                        y,
                        window->width * PALETTE_WIDTH_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
-                       editor.font_scale,
+                       (f32) editor.font_scale,
                        ACC_COLOR, PALETTE_ALPHA);
         } else {
           tr_set_bg_color(&ptr, option->bg_r, option->bg_g, option->bg_b);
@@ -804,13 +804,13 @@ i32 main(i32 argc, char **argv) {
       tr_set_bg_color(&str, ALT_BG_COLOR);
       tr_set_fg_color(&str, ALT_FG_COLOR);
 
-      f32 y = window->height - (editor.font_scale + BUFFER_PADDING);
+      f32 y = window->height - ((f32) editor.font_scale + BUFFER_PADDING);
 
       sr_draw_rect(&sr,
                    0.0,
                    y,
                    window->width,
-                   editor.font_scale + BUFFER_PADDING,
+                   (f32) editor.font_scale + BUFFER_PADDING,
                    ALT_BG_COLOR, 1.0);
 
       y += BUFFER_PADDING * 0.5;
