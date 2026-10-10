@@ -847,13 +847,14 @@ i32 main(i32 argc, char **argv) {
 
           u32 i = 0;
           while (i < editor.completions_scroll) {
-            if (item_index >= bucket->len) {
+            if (editor.completions_scroll - i < bucket->len) {
+              item_index = editor.completions_scroll - i;
+              i += item_index;
+              break;
+            } else {
               i += bucket->len;
               ++bucket;
               item_index = 0;
-            } else {
-              ++i;
-              ++item_index;
             }
           }
 
