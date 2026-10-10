@@ -52,4 +52,6 @@ WideStr buffer_get_line(Buffer *buffer, u32 index);
 
 u32 buffer_get_rows(Buffer *buffer);
 
+WideStr buffer_get_word_before_cursor(Buffer *buffer);
+
 #endif // BUFFER_H

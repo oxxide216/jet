@@ -176,14 +176,15 @@ i32 main(i32 argc, char **argv) {
   MainBuffer main_buffer = main_buffer_make(NULL);
   DA_APPEND(editor.main_buffers, main_buffer);
   editor.palette_buffer = buffer_make();
-
   editor.mode = JetModeEditor;
-
   editor.font_scale = DEFAULT_FONT_SCALE;
+  editor.completion_before_cursor_index = (u32) -1;
+  editor.completion_at_cursor_index = (u32) -1;
 
   if (argc > 1) {
     buffer_read_file(editor_current_buffer(&editor), argv[1]);
     editor.main_buffers.items[0].file_path = strdup(argv[1]);
+    editor_build_completions(&editor, 0, (u32) -1);
 
     for (u32 i = 2; i < (u32) argc; ++i) {
       MainBuffer main_buffer = main_buffer_make(NULL);
@@ -225,6 +226,43 @@ i32 main(i32 argc, char **argv) {
     WARN("Failed to create server: %s\n", cns_get_error_str(cns_error));
 
   while (is_running) {
+    // Update actual completions
+    if (editor.completing) {
+      WideStr word = buffer_get_word_before_cursor(&CURRENT_BUFFER());
+      if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
+        editor.actual_completions.len = 0;
+        for (u32 i = 0; i < editor.completions.len; ++i) {
+          Completion *completion = editor.completions.items + i;
+          if (!str_eq(completion->abs_file_path, CURRENT_ABS_FILE_PATH()))
+            continue;
+          WideStr line = buffer_get_line(&CURRENT_BUFFER(), completion->row);
+          if (completion->col + completion->len > line.len)
+            continue;
+          WideStr completion_wstr = { line.ptr + completion->col, completion->len };
+          if (wide_str_begins_with(completion_wstr, word) &&
+              completion_wstr.len > word.len) {
+            bool already_exists = false;
+            for (u32 j = 0; j < editor.actual_completions.len; ++j) {
+              Completion *actual_completion = editor.actual_completions.items + j;
+              WideStr line = buffer_get_line(&CURRENT_BUFFER(), actual_completion->row);
+              WideStr actual_completion_wstr =
+                { line.ptr + actual_completion->col, actual_completion->len };
+              if (wide_str_eq(actual_completion_wstr, completion_wstr)) {
+                already_exists = true;
+                break;
+              }
+            }
+            if (!already_exists)
+              DA_APPEND(editor.actual_completions, *completion);
+          }
+        }
+
+        if (editor.actual_completions.len > 0 &&
+            editor.completions_scroll >= editor.actual_completions.len)
+          editor.completions_scroll = editor.actual_completions.len;
+      }
+    }
+
     WinxEvent event;
     while ((event = winx_get_event(window, false)).kind != WinxEventKindNone) {
       is_running &= event.kind != WinxEventKindQuit;
@@ -257,7 +295,29 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeEnter: {
           if (!is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
-              buffer_insert_new_line(editor_current_buffer(&editor));
+              if (editor.completing &&
+                  editor.completions_scroll < editor.actual_completions.len) {
+                WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
+                WideStr word = buffer_get_word_before_cursor(&CURRENT_BUFFER());
+                Completion *completion =
+                  editor.actual_completions.items + editor.completions_scroll;
+                WideStr completion_line =
+                  buffer_get_line(&CURRENT_BUFFER(), completion->row);
+                while (CURRENT_BUFFER().cursor_col < line.len &&
+                       is_part_of_word(line.ptr[CURRENT_BUFFER().cursor_col]))
+                  ++CURRENT_BUFFER().cursor_col;
+                for (u32 i = 0; i < word.len; ++i)
+                  buffer_remove_before_cursor(&CURRENT_BUFFER());
+                for (u32 i = 0; i < completion->len; ++i)
+                  buffer_insert(&CURRENT_BUFFER(),
+                                completion_line.ptr[completion->col + i]);
+                editor.completing = false;
+              } else {
+                buffer_insert_new_line(&CURRENT_BUFFER());
+
+                if (editor.completing)
+                  editor_update_completions_on_buffer_change(&editor);
+              }
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
                 if (editor.provider->execute(&editor, editor.options, editor.selected_option)) {
@@ -273,8 +333,25 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeTab: {
           if (!is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
-              for (u32 i = 0; i < SPACES_PER_TAB; ++i)
-                buffer_insert(editor_current_buffer(&editor), ' ');
+              if (editor.completing &&
+                  editor.completions_scroll < editor.actual_completions.len) {
+                if (is_shift_pressed) {
+                  if (editor.completions_scroll > 0)
+                    --editor.completions_scroll;
+                  else if (editor.actual_completions.len == 0)
+                    editor.completions_scroll = 0;
+                  else
+                    editor.completions_scroll = editor.actual_completions.len - 1;
+                } else {
+                  if (editor.completions_scroll + 1 < editor.actual_completions.len)
+                    ++editor.completions_scroll;
+                  else
+                    editor.completions_scroll = 0;
+                }
+              } else {
+                for (u32 i = 0; i < SPACES_PER_TAB; ++i)
+                  buffer_insert(editor_current_buffer(&editor), ' ');
+              }
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
                 buffer_remove_line(editor_current_buffer(&editor));
@@ -292,6 +369,9 @@ i32 main(i32 argc, char **argv) {
             buffer_remove_word_before_cursor(editor_current_buffer(&editor));
           else
             buffer_remove_before_cursor(editor_current_buffer(&editor));
+
+          if (editor.completing)
+            editor_update_completions_on_buffer_change(&editor);
         } break;
 
         case WinxKeyCodeDelete: {
@@ -299,6 +379,9 @@ i32 main(i32 argc, char **argv) {
             buffer_remove_word_at_cursor(editor_current_buffer(&editor));
           else
             buffer_remove_at_cursor(editor_current_buffer(&editor));
+
+          if (editor.completing)
+            editor_update_completions_on_buffer_change(&editor);
         } break;
 
         case WinxKeyCodeLeft: {
@@ -309,6 +392,7 @@ i32 main(i32 argc, char **argv) {
                   --editor.current_main_buffer_index;
                 else
                   editor.current_main_buffer_index = editor.main_buffers.len - 1;
+                editor.completing = false;
               }
             } else {
               buffer_move_left_word(editor_current_buffer(&editor), is_shift_pressed);
@@ -316,6 +400,8 @@ i32 main(i32 argc, char **argv) {
           } else {
             buffer_move_left(editor_current_buffer(&editor), is_shift_pressed);
           }
+
+          editor.completing = false;
         } break;
 
         case WinxKeyCodeRight: {
@@ -326,6 +412,7 @@ i32 main(i32 argc, char **argv) {
                   ++editor.current_main_buffer_index;
                 else
                   editor.current_main_buffer_index = 0;
+                editor.completing = false;
               }
             } else {
               buffer_move_right_word(editor_current_buffer(&editor), is_shift_pressed);
@@ -333,6 +420,8 @@ i32 main(i32 argc, char **argv) {
           } else {
             buffer_move_right(editor_current_buffer(&editor), is_shift_pressed);
           }
+
+          editor.completing = false;
         } break;
 
         case WinxKeyCodeDown: {
@@ -352,11 +441,19 @@ i32 main(i32 argc, char **argv) {
                 buffer_move_down_paragraph(editor_current_buffer(&editor), is_shift_pressed);
               }
             } else {
-              WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
-              u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
-              buffer_move_down(editor_current_buffer(&editor),
-                               is_shift_pressed,
-                               max_visual_line_len);
+              if (editor.completing &&
+                  editor.completions_scroll < editor.actual_completions.len) {
+                if (editor.completions_scroll + 1 < editor.actual_completions.len)
+                  ++editor.completions_scroll;
+                else
+                  editor.completions_scroll = 0;
+              } else {
+                WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
+                u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
+                buffer_move_down(editor_current_buffer(&editor),
+                                 is_shift_pressed,
+                                 max_visual_line_len);
+              }
             }
           } else if (editor.mode == JetModeCommandPalette) {
             if (editor.selected_option + 1 < editor.options.len)
@@ -383,11 +480,21 @@ i32 main(i32 argc, char **argv) {
                 buffer_move_up_paragraph(editor_current_buffer(&editor), is_shift_pressed);
               }
             } else {
-              WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
-              u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
-              buffer_move_up(editor_current_buffer(&editor),
-                             is_shift_pressed,
-                             max_visual_line_len);
+              if (editor.completing &&
+                  editor.completions_scroll < editor.actual_completions.len) {
+                if (editor.completions_scroll > 0)
+                  --editor.completions_scroll;
+                else if (editor.actual_completions.len == 0)
+                  editor.completions_scroll = 0;
+                else
+                  editor.completions_scroll = editor.actual_completions.len - 1;
+              } else {
+                WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
+                u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
+                buffer_move_up(editor_current_buffer(&editor),
+                               is_shift_pressed,
+                               max_visual_line_len);
+              }
             }
           } else if (editor.mode == JetModeCommandPalette) {
             if (editor.selected_option > 0)
@@ -492,6 +599,7 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeK: {
           if (is_ctrl_pressed) {
+            editor_remove_invalidated_completions(&editor, CURRENT_ABS_FILE_PATH());
             buffer_delete(&CURRENT_BUFFER());
             if (CURRENT_FILE_PATH())
               free(CURRENT_FILE_PATH());
@@ -514,8 +622,17 @@ i32 main(i32 argc, char **argv) {
         } break;
 
         case WinxKeyCodeEscape: {
-          if (editor.mode == JetModeCommandPalette)
+          if (editor.mode == JetModeEditor)
+            editor.completing = false;
+          else if (editor.mode == JetModeCommandPalette)
             editor.mode = JetModeEditor;
+        } break;
+
+        case WinxKeyCodeSpace: {
+          if (is_ctrl_pressed && editor.mode == JetModeEditor) {
+            editor.completing = true;
+            editor.completions_scroll = 0;
+          }
         } break;
 
         default: break;
@@ -532,13 +649,24 @@ i32 main(i32 argc, char **argv) {
       } break;
 
       case WinxEventKindChar: {
-        if (!is_ctrl_pressed && !is_alt_pressed)
+        if (!is_ctrl_pressed && !is_alt_pressed) {
           buffer_insert(editor_current_buffer(&editor), event.as._char._char);
+#if AUTOCOMPLETION
+          if (!editor.completing)
+            editor.completions_scroll = 0;
+          editor.completing = true;
+#endif
+          if (editor.completing)
+            editor_update_completions_on_buffer_change(&editor);
+        }
       } break;
 
       default: break;
       }
     }
+
+    if (editor.completing)
+      editor_update_completion_at_cursor_if_cursor_moved(&editor);
 
     // Handle document changes to correctly display inline errors
     if (editor.mode == JetModeEditor &&
@@ -684,8 +812,75 @@ i32 main(i32 argc, char **argv) {
         CURRENT_SCROLL() = CURRENT_BUFFER().cursor_row - visible_lines + 1;
     }
 
-    // Rendering command palette
-    if (editor.mode == JetModeCommandPalette) {
+    if (editor.mode == JetModeEditor) {
+      if (editor.completing && !CURRENT_BUFFER().is_selecting) {
+        WideStr word = buffer_get_word_before_cursor(&CURRENT_BUFFER());
+        if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
+          if (editor.actual_completions.len > 0) {
+            // Rendering completion options
+
+            if (editor.completions_scroll >= editor.actual_completions.len)
+              editor.completions_scroll = editor.actual_completions.len;
+
+            f32 x = tr.sel_end_x;
+            f32 y = tr.sel_end_y + (f32) editor.font_scale;
+            f32 width =
+              MAX_COMPLETIONS_WINDOW_WIDTH +
+              COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
+            f32 height =
+              (f32) COMPLETIONS_WINDOW_CAPACITY *
+              (f32) editor.font_scale +
+              BUFFER_PADDING +
+              COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
+
+            bool y_inverse =
+              y + height >
+              window->height - ((f32) editor.font_scale + BUFFER_PADDING);
+
+            if (y_inverse)
+              y -= height + (f32) editor.font_scale;
+
+            sr_draw_rect(&sr, x, y, width, height, FG_COLOR, 1.0);
+
+            x += COMPLETIONS_WINDOW_BORDER_WIDTH;
+            y += COMPLETIONS_WINDOW_BORDER_WIDTH;
+            width -= COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
+            height -= COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
+
+            sr_draw_rect(&sr, x, y, width, height, BG_COLOR, 1.0);
+
+            f32 y_limit = y + height;
+
+            y += BUFFER_PADDING * 0.5;
+
+            sr_draw_rect(&sr, x, y, width, (f32) editor.font_scale, FG_COLOR, 1.0);
+
+            x += BUFFER_PADDING * 0.5;
+
+            ptr.x_lower_limit = x;
+            ptr.x_higher_limit = x + width;
+
+            tr_set_bg_color(&ptr, FG_COLOR);
+            tr_set_fg_color(&ptr, BG_COLOR);
+
+            for (u32 i = editor.completions_scroll;
+                 i < editor.actual_completions.len && y <= y_limit;
+                 ++i) {
+              Completion *completion = editor.actual_completions.items + i;
+              WideStr line = buffer_get_line(&CURRENT_BUFFER(), completion->row);
+              tr_draw_text(&ptr, line.ptr + completion->col, completion->len, x, y);
+              y += (f32) editor.font_scale;
+
+              if (i == editor.completions_scroll) {
+                tr_set_bg_color(&ptr, BG_COLOR);
+                tr_set_fg_color(&ptr, FG_COLOR);
+              }
+            }
+          }
+        }
+      }
+    } else if (editor.mode == JetModeCommandPalette) {
+      // Rendering command palette
       WideStr line = buffer_get_current_line(editor_current_buffer(&editor));
 
       tr_set_bg_color(&ptr, BG_COLOR);
@@ -893,6 +1088,10 @@ i32 main(i32 argc, char **argv) {
 
   cns_destroy(cns);
 
+  if (editor.completions.items)
+    free(editor.completions.items);
+  if (editor.actual_completions.items)
+    free(editor.actual_completions.items);
   buffer_delete(&editor.palette_buffer);
   for (u32 i = 0; i < editor.main_buffers.len; ++i) {
     buffer_delete(&editor.main_buffers.items[i].buffer);

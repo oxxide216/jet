@@ -37,6 +37,17 @@ WideStr wide_str_dup(WideStr str) {
   return str;
 }
 
+bool wide_str_eq(WideStr a, WideStr b) {
+  if (a.len != b.len)
+    return false;
+
+  for (u32 i = 0; i < a.len; ++i)
+    if (a.ptr[i] != b.ptr[i])
+      return false;
+
+  return true;
+}
+
 void put_wide_char(u32 ch, FILE *stream) {
   u8 *ptr = (u8 *) &ch;
 
@@ -150,4 +161,8 @@ void destructurize_color(f32 *o_r, f32 *o_g, f32 *o_b, f32 r, f32 g, f32 b) {
   *o_r = r;
   *o_g = g;
   *o_b = b;
+}
+
+bool is_part_of_word(u32 _char) {
+  return iswalnum(_char) || _char == '_' || _char == '-';
 }

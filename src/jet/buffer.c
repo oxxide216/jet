@@ -578,3 +578,22 @@ WideStr buffer_get_line(Buffer *buffer, u32 index) {
 u32 buffer_get_rows(Buffer *buffer) {
   return buffer->lines.len;
 }
+
+WideStr buffer_get_word_before_cursor(Buffer *buffer) {
+  WideStr result = buffer_get_current_line(buffer);
+  u32 line_len = result.len;
+  result.ptr += buffer->cursor_col;
+  result.len = 0;
+
+  while (result.len < buffer->cursor_col &&
+         is_part_of_word(result.ptr[-1])) {
+    --result.ptr;
+    ++result.len;
+  }
+
+  while (result.len < line_len &&
+         is_part_of_word(result.ptr[result.len]))
+    ++result.len;
+
+  return result;
+}

@@ -78,6 +78,8 @@ typedef struct {
   u32             sel_begin_col;
   u32             sel_end_row;
   u32             sel_end_col;
+  f32             sel_end_x;
+  f32             sel_end_y;
   f32             x_lower_limit;
   f32             x_higher_limit;
   u32             line_index;

@@ -265,6 +265,11 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len,
   u32 last_wrap_i = 0;
 
   for (u32 i = 0; i < text_len; ++i) {
+    if (tr->line_index == tr->sel_end_row && i + 1 == tr->sel_end_col) {
+      tr->sel_end_x = x;
+      tr->sel_end_y = y;
+    }
+
     bool is_selected =
       (tr->line_index == tr->sel_begin_row &&
        tr->line_index == tr->sel_end_row &&
@@ -361,6 +366,11 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len,
     }
 
     DA_APPEND(tr->sel_ssbo_data, sel_entry);
+  }
+
+  if (tr->line_index == tr->sel_end_row && text_len + 1 == tr->sel_end_col) {
+    tr->sel_end_x = x;
+    tr->sel_end_y = y;
   }
 
   ++tr->line_index;
