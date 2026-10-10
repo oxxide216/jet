@@ -19,28 +19,57 @@ static TextVertex vertices[4] = {0};
 
 static u32 indices[] = { 0, 1, 2, 2, 1, 3 };
 
+Atlas atlas_make(VikInstance *instance, Str font) {
+  Atlas atlas = {0};
+  atlas.instance = instance;
+
+  i32 offset = stbtt_GetFontOffsetForIndex((u8 *) font.ptr, 0);
+  stbtt_InitFont(&atlas.font, (u8 *) font.ptr, offset);
+
+  atlas.data = malloc(ATLAS_WIDTH * ATLAS_HEIGHT * sizeof(*atlas.data));
+  atlas.image = vik_make_image_ex(instance, atlas.data,
+                                  ATLAS_WIDTH, ATLAS_HEIGHT,
+                                  VikImageFormatR8,
+                                  VikImageFilterLinear);
+
+  return atlas;
+}
+
+void atlas_ensure_is_actual(Atlas *atlas) {
+  if (atlas->is_glyphs_cache_dirty) {
+    vik_delete_image(atlas->image);
+    atlas->image = vik_make_image_ex(atlas->instance, atlas->data,
+                                     ATLAS_WIDTH, ATLAS_HEIGHT,
+                                     VikImageFormatR8,
+                                     VikImageFilterLinear);
+
+    ++atlas->image_generation;
+    atlas->is_glyphs_cache_dirty = false;
+  }
+}
+
+void atlas_delete(Atlas *atlas) {
+  vik_delete_image(atlas->image);
+  free(atlas->data);
+  if (atlas->glyphs_cache.items)
+    free(atlas->glyphs_cache.items);
+}
+
 TextRenderer tr_make(WinxWindow *window,
                      VikInstance *instance,
                      VikExecutor *executor,
-                     Str font,
+                     Atlas *atlas,
                      Str text_vert_bc,
                      Str text_frag_bc,
                      Str sel_vert_bc,
                      Str sel_frag_bc) {
   TextRenderer tr = {0};
+  tr.atlas = atlas;
   tr.window = window;
   tr.instance = instance;
   tr.executor = executor;
 
-  i32 offset = stbtt_GetFontOffsetForIndex((u8 *) font.ptr, 0);
-  stbtt_InitFont(&tr.font, (u8 *) font.ptr, offset);
-
   tr.ubo = vik_make_buffer(instance, sizeof(TextUBO), VikBufferKindUBO);
-  tr.atlas_data = malloc(ATLAS_WIDTH * ATLAS_HEIGHT * sizeof(*tr.atlas_data));
-  tr.atlas = vik_make_image_ex(instance, tr.atlas_data,
-                               ATLAS_WIDTH, ATLAS_HEIGHT,
-                               VikImageFormatR8,
-                               VikImageFilterLinear);
 
   VikShader *text_shader = vik_make_shader_vf(instance, text_vert_bc, text_frag_bc);
   tr.text_ssbo = vik_make_buffer(instance, 1, VikBufferKindSSBO);
@@ -48,7 +77,7 @@ TextRenderer tr_make(WinxWindow *window,
   tr.text_pipeline = vik_make_pipeline(instance, text_shader,
                                        attrs, ARRAY_LEN(attrs),
                                        text_buffers, ARRAY_LEN(text_buffers),
-                                       &tr.atlas, 1);
+                                       &atlas->image, 1);
   vik_delete_shader(text_shader);
 
   VikShader *sel_shader = vik_make_shader_vf(instance, sel_vert_bc, sel_frag_bc);
@@ -90,13 +119,13 @@ void tr_begin_frame(TextRenderer *tr, f32 scale,
   tr->line_index = 0;
 }
 
-static void get_char_data(TextRenderer *tr, u32 _char, f32 scale,
+static void get_char_data(Atlas *atlas, u32 _char, f32 scale,
                           f32 *out_x, f32 *out_y,
                           f32 *out_width, f32 *out_height,
                           f32 *out_tl_u, f32 *out_tl_v,
                           f32 *out_br_u, f32 *out_br_v) {
-  for (u32 i = 0; i < tr->glyphs_cache.len; ++i) {
-    Glyph *glyph = tr->glyphs_cache.items + i;
+  for (u32 i = 0; i < atlas->glyphs_cache.len; ++i) {
+    Glyph *glyph = atlas->glyphs_cache.items + i;
     if (glyph->_char == _char && glyph->scale == scale) {
       if (out_x)
         *out_x += glyph->x_offset;
@@ -118,52 +147,51 @@ static void get_char_data(TextRenderer *tr, u32 _char, f32 scale,
     }
   }
 
-  f32 scale_y = stbtt_ScaleForPixelHeight(&tr->font, scale);
+  f32 scale_y = stbtt_ScaleForPixelHeight(&atlas->font, scale);
   i32 width = 0, height = 0;
-  u8 *bitmap = stbtt_GetCodepointBitmap(&tr->font, 0.0, scale_y, _char,
+  u8 *bitmap = stbtt_GetCodepointBitmap(&atlas->font, 0.0, scale_y, _char,
                                         &width, &height, NULL, NULL);
 
   // Resetting in case we zoomed in/out too many times
-  if (tr->atlas_cursor_x + width + ATLAS_PADDING > ATLAS_WIDTH) {
-    tr->atlas_cursor_x = 0;
+  if (atlas->cursor_x + width + ATLAS_PADDING > ATLAS_WIDTH) {
+    atlas->cursor_x = 0;
 
-    memset(tr->atlas_data, 0, ATLAS_WIDTH * ATLAS_HEIGHT * sizeof(*tr->atlas_data));
+    memset(atlas->data, 0, ATLAS_WIDTH * ATLAS_HEIGHT * sizeof(*atlas->data));
 
-    tr->glyphs_cache.len = 0;
+    atlas->glyphs_cache.len = 0;
   }
 
   // If this fails, increase atlas size
-  assert(tr->atlas_cursor_x + width + ATLAS_PADDING <= ATLAS_WIDTH);
+  assert(atlas->cursor_x + width + ATLAS_PADDING <= ATLAS_WIDTH);
   assert(height <= ATLAS_HEIGHT);
 
-  tr->atlas_cursor_x += ATLAS_PADDING;
+  atlas->cursor_x += ATLAS_PADDING;
 
   for (u32 y = 0; y < (u32) height; ++y)
     for (u32 x = 0; x < (u32) width; ++x)
-      tr->atlas_data[y * ATLAS_WIDTH + x + tr->atlas_cursor_x] =
-        bitmap[y * width + x];
+      atlas->data[y * ATLAS_WIDTH + x + atlas->cursor_x] = bitmap[y * width + x];
 
   f32 o_width = (f32) width;
   f32 o_height = (f32) height;
 
-  f32 o_tl_u = (f32) tr->atlas_cursor_x / ATLAS_WIDTH;
+  f32 o_tl_u = (f32) atlas->cursor_x / ATLAS_WIDTH;
   f32 o_tl_v = 0.0;
 
-  tr->atlas_cursor_x += width;
+  atlas->cursor_x += width;
 
-  f32 o_br_u = (f32) tr->atlas_cursor_x / ATLAS_WIDTH;
+  f32 o_br_u = (f32) atlas->cursor_x / ATLAS_WIDTH;
   f32 o_br_v = (f32) height / ATLAS_HEIGHT;
 
   free(bitmap);
 
   i32 advance, lsb;
-  stbtt_GetCodepointHMetrics(&tr->font, _char, &advance, &lsb);
+  stbtt_GetCodepointHMetrics(&atlas->font, _char, &advance, &lsb);
 
   i32 ascent;
-  stbtt_GetFontVMetrics(&tr->font, &ascent, NULL, NULL);
+  stbtt_GetFontVMetrics(&atlas->font, &ascent, NULL, NULL);
 
   int y0;
-  stbtt_GetCodepointBitmapBox(&tr->font, _char, 0.0, scale_y, NULL, &y0, NULL, NULL);
+  stbtt_GetCodepointBitmapBox(&atlas->font, _char, 0.0, scale_y, NULL, &y0, NULL, NULL);
 
   f32 x_offset = advance * scale_y;
   f32 y_offset = ascent * scale_y + y0;
@@ -176,8 +204,8 @@ static void get_char_data(TextRenderer *tr, u32 _char, f32 scale,
     o_tl_u, o_tl_v,
     o_br_u, o_br_v,
   };
-  DA_APPEND(tr->glyphs_cache, glyph);
-  tr->is_glyphs_cache_dirty = true;
+  DA_APPEND(atlas->glyphs_cache, glyph);
+  atlas->is_glyphs_cache_dirty = true;
 
   if (out_x)
     *out_x += x_offset;
@@ -219,7 +247,7 @@ f32 tr_measure_text(TextRenderer *tr, u32 *text, u32 text_len) {
   f32 width = 0.0;
 
   for (u32 i = 0; i < text_len; ++i)
-    get_char_data(tr, text[i], tr->scale,
+    get_char_data(tr->atlas, text[i], tr->scale,
                   &width, NULL, NULL, NULL,
                   NULL, NULL, NULL, NULL);
 
@@ -260,7 +288,7 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len,
       r, g, b,
       {},
     };
-    get_char_data(tr, text[i], tr->scale,
+    get_char_data(tr->atlas, text[i], tr->scale,
                   &x, &text_entry.y,
                   &text_entry.w, &text_entry.h,
                   &text_entry.tl_u, &text_entry.tl_v,
@@ -325,9 +353,9 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len,
     };
 
     if (sel_entry.w == 0.0 || tr->sel_end_row > tr->line_index) {
-      f32 scale_y = stbtt_ScaleForPixelHeight(&tr->font, tr->scale);
+      f32 scale_y = stbtt_ScaleForPixelHeight(&tr->atlas->font, tr->scale);
       int advance;
-      stbtt_GetCodepointHMetrics(&tr->font, ' ', &advance, NULL);
+      stbtt_GetCodepointHMetrics(&tr->atlas->font, ' ', &advance, NULL);
       sel_entry.w += advance * scale_y;
     }
 
@@ -351,7 +379,7 @@ void tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
       tr->fg_r, tr->fg_g, tr->fg_b,
       {},
     };
-    get_char_data(tr, text[i], tr->scale,
+    get_char_data(tr->atlas, text[i], tr->scale,
                   &x, &text_entry.y,
                   &text_entry.w, &text_entry.h,
                   &text_entry.tl_u, &text_entry.tl_v,
@@ -394,19 +422,12 @@ void tr_end_frame(TextRenderer *tr) {
   if (tr->sel_ssbo_data.len > 0)
     vik_set_buffer_data(tr->sel_ssbo, tr->sel_ssbo_data.items);
 
-  if (tr->is_glyphs_cache_dirty) {
-    vik_delete_image(tr->atlas);
-    tr->atlas = vik_make_image_ex(tr->instance, tr->atlas_data,
-                                  ATLAS_WIDTH, ATLAS_HEIGHT,
-                                  VikImageFormatR8,
-                                  VikImageFilterLinear);
-  }
-
-  if (should_recreate_text_ssbo || tr->is_glyphs_cache_dirty) {
+  if (should_recreate_text_ssbo ||
+      tr->last_atlas_image_generation < tr->atlas->image_generation) {
     VikBuffer *buffers[] = { tr->ubo, tr->text_ssbo, };
-    vik_use_resources(tr->text_pipeline, buffers, ARRAY_LEN(buffers), &tr->atlas, 1);
+    vik_use_resources(tr->text_pipeline, buffers, ARRAY_LEN(buffers), &tr->atlas->image, 1);
 
-    tr->is_glyphs_cache_dirty = false;
+    tr->last_atlas_image_generation = tr->atlas->image_generation;
   }
 
   if (should_recreate_sel_ssbo) {
@@ -424,16 +445,12 @@ void tr_delete(TextRenderer *tr) {
   vik_delete_mesh(tr->mesh);
   vik_delete_pipeline(tr->sel_pipeline);
   vik_delete_pipeline(tr->text_pipeline);
-  vik_delete_image(tr->atlas);
   vik_delete_buffer(tr->sel_ssbo);
   vik_delete_buffer(tr->text_ssbo);
   vik_delete_buffer(tr->ubo);
 
-  free(tr->atlas_data);
   if (tr->sel_ssbo_data.items)
     free(tr->sel_ssbo_data.items);
   if (tr->text_ssbo_data.items)
     free(tr->text_ssbo_data.items);
-  if (tr->glyphs_cache.items)
-    free(tr->glyphs_cache.items);
 }

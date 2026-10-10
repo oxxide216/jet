@@ -1,5 +1,3 @@
-// TODO: separate glyph atlas from text renderer and reuse it
-
 #include <wchar.h>
 
 #include "shl/shl-defs.h"
@@ -140,8 +138,10 @@ i32 main(i32 argc, char **argv) {
   VikInstance *instance = vik_make_instance(window, VikRequestFlagsNone, false);
   VikExecutor *executor = vik_make_executor(instance);
 
+  Atlas atlas = atlas_make(instance, fonts_MonaspaceNeon_Regular_otf);
+
   TextRenderer tr = tr_make(window, instance, executor,
-                            fonts_MonaspaceNeon_Regular_otf,
+                            &atlas,
                             build_shaders_text_vert_spv,
                             build_shaders_text_frag_spv,
                             build_shaders_sel_vert_spv,
@@ -149,7 +149,7 @@ i32 main(i32 argc, char **argv) {
   tr_resize(&tr, window->width, window->height);
 
   TextRenderer str = tr_make(window, instance, executor,
-                             fonts_MonaspaceNeon_Regular_otf,
+                             &atlas,
                              build_shaders_text_vert_spv,
                              build_shaders_text_frag_spv,
                              build_shaders_sel_vert_spv,
@@ -157,7 +157,7 @@ i32 main(i32 argc, char **argv) {
   tr_resize(&str, window->width, window->height);
 
   TextRenderer ptr = tr_make(window, instance, executor,
-                             fonts_MonaspaceNeon_Regular_otf,
+                             &atlas,
                              build_shaders_text_vert_spv,
                              build_shaders_text_frag_spv,
                              build_shaders_sel_vert_spv,
@@ -881,6 +881,7 @@ i32 main(i32 argc, char **argv) {
       tr_draw_text(&str, buffer, len, x, y);
     }
 
+    atlas_ensure_is_actual(&atlas);
     tr_end_frame(&tr);
     sr_end_frame(&sr);
     tr_end_frame(&str);
@@ -912,6 +913,7 @@ i32 main(i32 argc, char **argv) {
   tr_delete(&ptr);
   tr_delete(&str);
   tr_delete(&tr);
+  atlas_delete(&atlas);
   vik_delete_executor(executor);
   vik_delete_instance(instance);
 

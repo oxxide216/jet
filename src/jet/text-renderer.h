@@ -18,6 +18,17 @@ typedef struct {
 typedef Da(Glyph) Glyphs;
 
 typedef struct {
+  stbtt_fontinfo  font;
+  Glyphs          glyphs_cache;
+  u8             *data;
+  u32             cursor_x;
+  VikInstance    *instance;
+  VikImage       *image;
+  u64             image_generation;
+  bool            is_glyphs_cache_dirty;
+} Atlas;
+
+typedef struct {
   f32 screen_width;
   f32 screen_height;
 } TextUBO;
@@ -43,22 +54,19 @@ typedef struct {
 typedef Da(SelSSBOEntry) SelSSBO;
 
 typedef struct {
-  stbtt_fontinfo  font;
-  Glyphs          glyphs_cache;
+  Atlas          *atlas;
+  u64             last_atlas_image_generation;
   TextUBO         ubo_data;
   TextSSBO        text_ssbo_data;
   SelSSBO         sel_ssbo_data;
   u32             max_text_ssbo_data_len;
   u32             max_sel_ssbo_data_len;
-  u8             *atlas_data;
-  u32             atlas_cursor_x;
   WinxWindow     *window;
   VikInstance    *instance;
   VikExecutor    *executor;
   VikBuffer      *ubo;
   VikBuffer      *text_ssbo;
   VikBuffer      *sel_ssbo;
-  VikImage       *atlas;
   VikPipeline    *text_pipeline;
   VikPipeline    *sel_pipeline;
   VikMesh        *mesh;
@@ -77,10 +85,14 @@ typedef struct {
   bool            is_ubo_data_dirty;
 } TextRenderer;
 
+Atlas atlas_make(VikInstance *instance, Str font);
+void  atlas_ensure_is_actual(Atlas *atlas);
+void  atlas_delete(Atlas *atlas);
+
 TextRenderer tr_make(WinxWindow *window,
                      VikInstance *instance,
                      VikExecutor *executor,
-                     Str font,
+                     Atlas *atlas,
                      Str text_vert_bc,
                      Str text_frag_bc,
                      Str sel_vert_bc,
