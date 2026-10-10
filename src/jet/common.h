@@ -21,6 +21,7 @@ bool      wide_str_begins_with(WideStr str, WideStr prefix);
 WideStrs  wide_strs_select_prefixed(WideStrs strs, WideStr content);
 WideStr   wide_str_dup(WideStr str);
 bool      wide_str_eq(WideStr a, WideStr b);
+u64       wide_str_hash(WideStr str);
 void      put_wide_char(u32 ch, FILE *stream);
 u32       get_wide_char(FILE *stream);
 WideStr   str_to_wide_str(Str str);

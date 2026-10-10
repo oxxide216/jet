@@ -29,6 +29,7 @@ typedef struct {
   WideStringBuilder wsb;
   u32               row, col;
   Str               abs_file_path;
+  u64               hash;
 } Completion;
 
 typedef Da(Completion) Completions;

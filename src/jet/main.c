@@ -675,11 +675,7 @@ i32 main(i32 argc, char **argv) {
             bool already_exists = false;
             for (u32 j = 0; j < editor.actual_completions.len; ++j) {
               Completion *completion1 = editor.completions.items + j;
-              WideStr completion1_wstr = {
-                completion1->wsb.items,
-                completion1->wsb.len,
-              };
-              if (wide_str_eq(completion0_wstr, completion1_wstr)) {
+              if (completion0->hash == completion1->hash) {
                 already_exists = true;
                 break;
               }

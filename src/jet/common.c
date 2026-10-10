@@ -48,6 +48,16 @@ bool wide_str_eq(WideStr a, WideStr b) {
   return true;
 }
 
+// sdbm hash function
+u64 wide_str_hash(WideStr str) {
+  u64 result = 0;
+
+  for (u32 i = 0; i < str.len; ++i)
+    result = str.ptr[i] + (result << 6) + (result << 16) - result;
+
+  return result;
+}
+
 void put_wide_char(u32 ch, FILE *stream) {
   u8 *ptr = (u8 *) &ch;
 

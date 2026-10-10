@@ -205,13 +205,17 @@ void editor_build_completions(Editor *editor, u32 main_buffer_index) {
       } else {
         if (found_word) {
           if (j - anchor >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
-            Completion new_completion = { {}, i, anchor, main_buffer->abs_file_path };
+            Completion new_completion = { {}, i, anchor, main_buffer->abs_file_path, 0 };
             new_completion.wsb.len = j - anchor;
             new_completion.wsb.cap = new_completion.wsb.len;
             new_completion.wsb.items =
               malloc(new_completion.wsb.len * sizeof(*new_completion.wsb.items));
             memcpy(new_completion.wsb.items, line.ptr + anchor,
                    new_completion.wsb.len * sizeof(*new_completion.wsb.items));
+            new_completion.hash = wide_str_hash((WideStr) {
+                new_completion.wsb.items,
+                new_completion.wsb.len,
+              });
             DA_APPEND(editor->completions, new_completion);
           }
           found_word = false;
@@ -220,13 +224,17 @@ void editor_build_completions(Editor *editor, u32 main_buffer_index) {
     }
 
     if (found_word && line.len > anchor) {
-      Completion new_completion = { {}, i, anchor, main_buffer->abs_file_path };
+      Completion new_completion = { {}, i, anchor, main_buffer->abs_file_path, 0 };
       new_completion.wsb.len = line.len - anchor;
       new_completion.wsb.cap = new_completion.wsb.len;
       new_completion.wsb.items =
         malloc(new_completion.wsb.len * sizeof(*new_completion.wsb.items));
       memcpy(new_completion.wsb.items, line.ptr + anchor,
              new_completion.wsb.len * sizeof(*new_completion.wsb.items));
+      new_completion.hash = wide_str_hash((WideStr) {
+          new_completion.wsb.items,
+          new_completion.wsb.len,
+        });
       DA_APPEND(editor->completions, new_completion);
     }
   }
@@ -339,6 +347,10 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
         DA_INSERT(completion->wsb,
                   main_buffer->buffer.cursor_col - completion->col,
                   param);
+        completion->hash = wide_str_hash((WideStr) {
+            completion->wsb.items,
+            completion->wsb.len,
+          });
         prev_was_before_cursor = false;
       } else if (prev_was_before_cursor) {
         WideStr word = buffer_get_word_at_cursor(&main_buffer->buffer);
@@ -347,6 +359,7 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
           main_buffer->buffer.cursor_row,
           main_buffer->buffer.cursor_col,
           main_buffer->abs_file_path,
+          0,
         };
         new_completion.wsb.len = word.len + 1;
         new_completion.wsb.cap = new_completion.wsb.len;
@@ -356,6 +369,10 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
                word.ptr,
                word.len * sizeof(*new_completion.wsb.items));
         new_completion.wsb.items[word.len] = param;
+        new_completion.hash = wide_str_hash((WideStr) {
+            new_completion.wsb.items,
+            new_completion.wsb.len,
+          });
         DA_INSERT(editor->completions, i, new_completion);
       }
     }
@@ -367,6 +384,7 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
         main_buffer->buffer.cursor_row,
         main_buffer->buffer.cursor_col,
         main_buffer->abs_file_path,
+        0,
       };
       new_completion.wsb.len = word.len + 1;
       new_completion.wsb.cap = new_completion.wsb.len;
@@ -376,6 +394,10 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
              word.ptr,
              word.len * sizeof(*new_completion.wsb.items));
       new_completion.wsb.items[word.len] = param;
+      new_completion.hash = wide_str_hash((WideStr) {
+          new_completion.wsb.items,
+          new_completion.wsb.len,
+        });
       DA_INSERT(editor->completions,
                 editor->current_row_completions_begin,
                 new_completion);
@@ -407,6 +429,11 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
             free(editor->completions.items[i].wsb.items);
             DA_REMOVE_AT(editor->completions, i);
             --i;
+          } else {
+            editor->completions.items[i].hash = wide_str_hash((WideStr) {
+                editor->completions.items[i].wsb.items,
+                editor->completions.items[i].wsb.len,
+              });
           }
         }
       }
@@ -435,6 +462,11 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
             free(editor->completions.items[i].wsb.items);
             DA_REMOVE_AT(editor->completions, i);
             --i;
+          } else {
+            editor->completions.items[i].hash = wide_str_hash((WideStr) {
+                editor->completions.items[i].wsb.items,
+                editor->completions.items[i].wsb.len,
+              });
           }
         }
       }
