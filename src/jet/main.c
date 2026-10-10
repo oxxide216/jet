@@ -257,11 +257,12 @@ i32 main(i32 argc, char **argv) {
           if (!is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
               if (editor.completing &&
-                  editor.completions_scroll < editor.actual_completions.len) {
+                  editor.completions_scroll < editor.actual_completions_len) {
                 WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
                 WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
+                u32 index = editor_get_bucket_index(&editor, word);
                 Completion *completion =
-                  editor.actual_completions.items + editor.completions_scroll;
+                  editor.actual_completions[index].items + editor.completions_scroll;
                 while (CURRENT_BUFFER().cursor_col < line.len &&
                        is_part_of_word(line.ptr[CURRENT_BUFFER().cursor_col]))
                   ++CURRENT_BUFFER().cursor_col;
@@ -291,16 +292,16 @@ i32 main(i32 argc, char **argv) {
           if (!is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
               if (editor.completing &&
-                  editor.completions_scroll < editor.actual_completions.len) {
+                  editor.completions_scroll < editor.actual_completions_len) {
                 if (is_shift_pressed) {
                   if (editor.completions_scroll > 0)
                     --editor.completions_scroll;
-                  else if (editor.actual_completions.len == 0)
+                  else if (editor.actual_completions_len == 0)
                     editor.completions_scroll = 0;
                   else
-                    editor.completions_scroll = editor.actual_completions.len - 1;
+                    editor.completions_scroll = editor.actual_completions_len - 1;
                 } else {
-                  if (editor.completions_scroll + 1 < editor.actual_completions.len)
+                  if (editor.completions_scroll + 1 < editor.actual_completions_len)
                     ++editor.completions_scroll;
                   else
                     editor.completions_scroll = 0;
@@ -426,8 +427,8 @@ i32 main(i32 argc, char **argv) {
               }
             } else {
               if (editor.completing &&
-                  editor.completions_scroll < editor.actual_completions.len) {
-                if (editor.completions_scroll + 1 < editor.actual_completions.len)
+                  editor.completions_scroll < editor.actual_completions_len) {
+                if (editor.completions_scroll + 1 < editor.actual_completions_len)
                   ++editor.completions_scroll;
                 else
                   editor.completions_scroll = 0;
@@ -465,13 +466,13 @@ i32 main(i32 argc, char **argv) {
               }
             } else {
               if (editor.completing &&
-                  editor.completions_scroll < editor.actual_completions.len) {
+                  editor.completions_scroll < editor.actual_completions_len) {
                 if (editor.completions_scroll > 0)
                   --editor.completions_scroll;
-                else if (editor.actual_completions.len == 0)
+                else if (editor.actual_completions_len == 0)
                   editor.completions_scroll = 0;
                 else
-                  editor.completions_scroll = editor.actual_completions.len - 1;
+                  editor.completions_scroll = editor.actual_completions_len - 1;
               } else {
                 WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
                 u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
@@ -659,33 +660,38 @@ i32 main(i32 argc, char **argv) {
 
     editor_update_current_row_completions_begin(&editor);
 
-    if (CURRENT_BUFFER().is_selecting)
+    if (editor.mode != JetModeEditor || CURRENT_BUFFER().is_selecting)
       editor.completing = false;
 
     if (editor.completing) {
       // Update actual completions
       WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
       if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
-        editor.actual_completions.len = 0;
+        editor.actual_completions_len = 0;
+        for (u32 i = 0; i < ARRAY_LEN(editor.actual_completions); ++i)
+          editor.actual_completions[i].len = 0;
+        u32 index = editor_get_bucket_index(&editor, word);
         for (u32 i = 0; i < editor.completions.len; ++i) {
           Completion *completion0 = editor.completions.items + i;
           WideStr completion0_wstr = { completion0->wsb.items, completion0->wsb.len };
           if (wide_str_begins_with(completion0_wstr, word) &&
               completion0_wstr.len > word.len) {
             bool already_exists = false;
-            for (u32 j = 0; j < editor.actual_completions.len; ++j) {
-              Completion *completion1 = editor.completions.items + j;
+            for (u32 j = 0; j < editor.actual_completions[index].len; ++j) {
+              Completion *completion1 = editor.actual_completions[index].items + j;
               if (completion0->hash == completion1->hash) {
                 already_exists = true;
                 break;
               }
             }
-            if (!already_exists)
-              DA_APPEND(editor.actual_completions, *completion0);
+            if (!already_exists) {
+              DA_APPEND(editor.actual_completions[index], *completion0);
+              ++editor.actual_completions_len;
+            }
           }
         }
 
-        if (editor.completions_scroll >= editor.actual_completions.len)
+        if (editor.completions_scroll >= editor.actual_completions_len)
           editor.completions_scroll = 0;
       }
     }
@@ -789,74 +795,93 @@ i32 main(i32 argc, char **argv) {
         CURRENT_SCROLL() = CURRENT_BUFFER().cursor_row - visible_lines + 1;
     }
 
-    if (editor.mode == JetModeEditor) {
-      if (editor.completing && !CURRENT_BUFFER().is_selecting) {
-        WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
-        if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
-          if (editor.actual_completions.len > 0) {
-            // Rendering completion options
+    if (editor.completing) {
+      WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
+      if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
+        if (editor.actual_completions_len > 0) {
+          // Rendering completion options
 
-            if (editor.completions_scroll >= editor.actual_completions.len)
-              editor.completions_scroll = editor.actual_completions.len;
-
-            f32 x = tr.sel_end_x;
-            f32 y = tr.sel_end_y + (f32) editor.font_scale;
-            f32 width =
-              MAX_COMPLETIONS_WINDOW_WIDTH +
-              COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
-            f32 height =
-              (f32) COMPLETIONS_WINDOW_CAPACITY *
-              (f32) editor.font_scale +
-              BUFFER_PADDING +
+          f32 x = tr.sel_end_x;
+          f32 y = tr.sel_end_y + (f32) editor.font_scale;
+          f32 width =
+            MAX_COMPLETIONS_WINDOW_WIDTH +
+            COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
+          f32 height =
+            (f32) COMPLETIONS_WINDOW_CAPACITY *
+            (f32) editor.font_scale +
+            BUFFER_PADDING +
               COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
 
-            bool y_inverse =
-              y + height >
-              window->height - ((f32) editor.font_scale + BUFFER_PADDING);
+          bool y_inverse =
+            y + height >
+            window->height - ((f32) editor.font_scale + BUFFER_PADDING);
 
-            if (y_inverse)
-              y -= height + (f32) editor.font_scale;
+          if (y_inverse)
+            y -= height + (f32) editor.font_scale;
 
-            sr_draw_rect(&sr, x, y, width, height, FG_COLOR, 1.0);
+          sr_draw_rect(&sr, x, y, width, height, FG_COLOR, 1.0);
 
-            x += COMPLETIONS_WINDOW_BORDER_WIDTH;
-            y += COMPLETIONS_WINDOW_BORDER_WIDTH;
-            width -= COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
-            height -= COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
+          x += COMPLETIONS_WINDOW_BORDER_WIDTH;
+          y += COMPLETIONS_WINDOW_BORDER_WIDTH;
+          width -= COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
+          height -= COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
 
-            sr_draw_rect(&sr, x, y, width, height, BG_COLOR, 1.0);
+          sr_draw_rect(&sr, x, y, width, height, BG_COLOR, 1.0);
 
-            f32 y_limit = y + height;
+          f32 y_limit = y + height;
 
-            y += BUFFER_PADDING * 0.5;
+          y += BUFFER_PADDING * 0.5;
 
-            sr_draw_rect(&sr, x, y, width, (f32) editor.font_scale, FG_COLOR, 1.0);
+          sr_draw_rect(&sr, x, y, width, (f32) editor.font_scale, FG_COLOR, 1.0);
 
-            x += BUFFER_PADDING * 0.5;
+          x += BUFFER_PADDING * 0.5;
 
-            ptr.x_lower_limit = x;
-            ptr.x_higher_limit = x + width;
+          ptr.x_lower_limit = x;
+          ptr.x_higher_limit = x + width;
 
-            tr_set_bg_color(&ptr, FG_COLOR);
-            tr_set_fg_color(&ptr, BG_COLOR);
+          tr_set_bg_color(&ptr, FG_COLOR);
+          tr_set_fg_color(&ptr, BG_COLOR);
 
-            for (u32 i = editor.completions_scroll;
-                 i < editor.actual_completions.len &&
-                   y + (f32) editor.font_scale <= y_limit;
-                 ++i) {
-              Completion *completion = editor.actual_completions.items + i;
-              tr_draw_text(&ptr, completion->wsb.items, completion->wsb.len, x, y);
-              y += (f32) editor.font_scale;
+          Completions *bucket = editor.actual_completions;
+          u32 item_index = 0;
 
-              if (i == editor.completions_scroll) {
-                tr_set_bg_color(&ptr, BG_COLOR);
-                tr_set_fg_color(&ptr, FG_COLOR);
-              }
+          u32 i = 0;
+          while (i < editor.completions_scroll) {
+            if (item_index >= bucket->len) {
+              i += bucket->len;
+              ++bucket;
+              item_index = 0;
+            } else {
+              ++i;
+              ++item_index;
+            }
+          }
+
+          for (u32 i = editor.completions_scroll;
+               i < editor.actual_completions_len &&
+                 y + (f32) editor.font_scale <= y_limit;
+               ++i) {
+            while (item_index >= bucket->len) {
+              ++bucket;
+              item_index = 0;
+            }
+
+            Completion *completion = bucket->items + item_index;
+            tr_draw_text(&ptr, completion->wsb.items, completion->wsb.len, x, y);
+            y += (f32) editor.font_scale;
+
+            ++item_index;
+
+            if (i == editor.completions_scroll) {
+              tr_set_bg_color(&ptr, BG_COLOR);
+              tr_set_fg_color(&ptr, FG_COLOR);
             }
           }
         }
       }
-    } else if (editor.mode == JetModeCommandPalette) {
+    }
+
+    if (editor.mode == JetModeCommandPalette) {
       // Rendering command palette
       WideStr line = buffer_get_current_line(editor_current_buffer(&editor));
 
@@ -1069,8 +1094,9 @@ i32 main(i32 argc, char **argv) {
     free(editor.completions.items[i].wsb.items);
   if (editor.completions.items)
     free(editor.completions.items);
-  if (editor.actual_completions.items)
-    free(editor.actual_completions.items);
+  for (u32 i = 0; i < ARRAY_LEN(editor.actual_completions); ++i)
+    if (editor.actual_completions[i].items)
+      free(editor.actual_completions[i].items);
   buffer_delete(&editor.palette_buffer);
   for (u32 i = 0; i < editor.main_buffers.len; ++i) {
     buffer_delete(&editor.main_buffers.items[i].buffer);

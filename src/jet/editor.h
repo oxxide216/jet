@@ -66,7 +66,8 @@ struct Editor {
 
   bool        completing;
   Completions completions;
-  Completions actual_completions;
+  Completions actual_completions[1024];
+  u32         actual_completions_len;
   u32         completions_scroll;
   u32         current_row_completions_begin;
   u32         prev_cursor_row;
@@ -89,5 +90,6 @@ void          editor_update_completions_before_action(Editor *editor,
                                                       u32 param);
 void          editor_remove_invalidated_completions(Editor *editor,
                                                     Str invalidated_abs_file_path);
+u32           editor_get_bucket_index(Editor *editor, WideStr str);
 
 #endif // EDITOR_H
