@@ -843,7 +843,8 @@ i32 main(i32 argc, char **argv) {
             tr_set_fg_color(&ptr, BG_COLOR);
 
             for (u32 i = editor.completions_scroll;
-                 i < editor.actual_completions.len && y <= y_limit;
+                 i < editor.actual_completions.len &&
+                   y + (f32) editor.font_scale <= y_limit;
                  ++i) {
               Completion *completion = editor.actual_completions.items + i;
               tr_draw_text(&ptr, completion->wsb.items, completion->wsb.len, x, y);
