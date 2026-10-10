@@ -812,11 +812,11 @@ i32 main(i32 argc, char **argv) {
             BUFFER_PADDING +
               COMPLETIONS_WINDOW_BORDER_WIDTH * 2.0;
 
-          bool y_inverse =
-            y + height >
-            window->height - ((f32) editor.font_scale + BUFFER_PADDING);
+          if (x + width > window->width - BUFFER_PADDING)
+            x -= x + width - (window->width - BUFFER_PADDING);
 
-          if (y_inverse)
+          if (y + height >
+              window->height - ((f32) editor.font_scale + BUFFER_PADDING))
             y -= height + (f32) editor.font_scale;
 
           sr_draw_rect(&sr, x, y, width, height, FG_COLOR, 1.0);
