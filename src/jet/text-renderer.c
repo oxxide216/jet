@@ -159,7 +159,8 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
 
     memset(atlas->data, 0, ATLAS_WIDTH * ATLAS_HEIGHT * sizeof(*atlas->data));
 
-    atlas->glyphs_cache[scale - MIN_FONT_SCALE].len = 0;
+    for (u32 i = 0; i < ARRAY_LEN(atlas->glyphs_cache); ++i)
+      atlas->glyphs_cache[i].len = 0;
   }
 
   // If this fails, increase atlas size
