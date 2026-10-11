@@ -1138,6 +1138,8 @@ i32 main(i32 argc, char **argv) {
     buffer_delete(&editor.main_buffers.items[i].buffer);
     if (editor.main_buffers.items[i].file_path)
       free(editor.main_buffers.items[i].file_path);
+    if (editor.main_buffers.items[i].abs_file_path.ptr)
+      free(editor.main_buffers.items[i].abs_file_path.ptr);
     if (editor.main_buffers.items[i].errors.items)
       free(editor.main_buffers.items[i].errors.items);
     if (editor.main_buffers.items[i].warnings.items)

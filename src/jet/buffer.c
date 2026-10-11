@@ -116,8 +116,10 @@ void buffer_insert_new_line(Buffer *buffer) {
   Line new_line = {0};
   new_line.len = line->len - buffer->cursor_col;
   new_line.cap = new_line.len;
-  new_line.items = malloc(new_line.cap * sizeof(u32));
-  memcpy(new_line.items, line->items + buffer->cursor_col, new_line.len * sizeof(u32));
+  if (new_line.cap > 0) {
+    new_line.items = malloc(new_line.cap * sizeof(u32));
+    memcpy(new_line.items, line->items + buffer->cursor_col, new_line.len * sizeof(u32));
+  }
 
   line->len = buffer->cursor_col;
 
