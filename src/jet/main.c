@@ -104,15 +104,16 @@ static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *dat
   data_len -= sizeof(u32);
 
   Editor *editor = cns_get_user_data(ctx);
-  editor_clear_entries(editor);
-  editor->entry_cursor = (u32) -1;
 
   u32 len = data_len;
   Message message;
   for (u32 i = 0; i < entries_len; ++i) {
     if (!decode_message(&message, &data, &len))
       break;
-    if (message.kind == MessageKindEntry) {
+    if (message.kind == MessageKindRerun) {
+      editor_clear_entries(editor);
+      editor->entry_cursor = (u32) -1;
+    } else if (message.kind == MessageKindEntry) {
       switch (message.as.entry.kind) {
       case EntryKindError: DA_APPEND(editor->errors,   message.as.entry); break;
       case EntryKindWarn:  DA_APPEND(editor->warnings, message.as.entry); break;
@@ -128,10 +129,9 @@ static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *dat
 }
 
 static void disconnected(CnsCtx *ctx, CnsConnection *connection) {
-  (void) connection;
-
   Editor *editor = cns_get_user_data(ctx);
-  editor->jwrap = NULL;
+  if (editor->jwrap == connection)
+    editor->jwrap = NULL;
 }
 
 i32 main(i32 argc, char **argv) {

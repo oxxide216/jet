@@ -262,6 +262,9 @@ i32 main(i32 argc, char **argv) {
           for (u32 i = 0; i < sizeof(u32); ++i)
             DA_APPEND(buffer, ((u8 *) &entries.len)[i]);
 
+          Message message = { MessageKindRerun, {} };
+          encode_message(&buffer, &message);
+
           for (u32 i = 0; i < entries.len; ++i) {
             Message message = { MessageKindEntry, { entries.items[i] } };
             encode_message(&buffer, &message);
