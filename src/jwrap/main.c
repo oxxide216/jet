@@ -267,7 +267,7 @@ i32 main(i32 argc, char **argv) {
             encode_message(&buffer, &message);
           }
 
-          cns_unix_send(server_connection, buffer.items, buffer.len);
+          while (!cns_unix_send(server_connection, buffer.items, buffer.len))
           if (buffer.items)
             free(buffer.items);
           for (u32 i = 0; i < entries.len; ++i) {
