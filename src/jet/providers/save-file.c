@@ -64,6 +64,7 @@ static bool execute(Editor *editor, PaletteOptions options, u32 index) {
   // Whether or not it is a regular file
   if (S_ISREG(stat_data.st_mode)) {
     buffer_write_file(&editor->main_buffers.items[editor->current_main_buffer_index].buffer, path);
+    highlighter_do_main_buffer(&editor->main_buffers.items[editor->current_main_buffer_index]);
 
     free(path);
     return true;
