@@ -110,7 +110,8 @@ static CnsResult data(CnsCtx *ctx, CnsConnection *connection, unsigned char *dat
   u32 len = data_len;
   Message message;
   for (u32 i = 0; i < entries_len; ++i) {
-    decode_message(&message, &data, &len);
+    if (!decode_message(&message, &data, &len))
+      break;
     if (message.kind == MessageKindEntry) {
       switch (message.as.entry.kind) {
       case EntryKindError: DA_APPEND(editor->errors,   message.as.entry); break;

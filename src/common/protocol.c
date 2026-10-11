@@ -12,7 +12,7 @@ bool decode_message(Message *message, u8 **buffer, u32 *len) {
     if (*len < sizeof(u32))
       return false;
     message->as.entry.file_path.len = *(u32 *) *buffer;
-    *len += sizeof(u32);
+    *len -= sizeof(u32);
     *buffer += sizeof(u32);
 
     if (*len < message->as.entry.file_path.len)
@@ -20,31 +20,31 @@ bool decode_message(Message *message, u8 **buffer, u32 *len) {
     message->as.entry.file_path.ptr =
       malloc(message->as.entry.file_path.len * sizeof(*message->as.entry.file_path.ptr));
     memcpy(message->as.entry.file_path.ptr, *buffer, message->as.entry.file_path.len);
-    *len += message->as.entry.file_path.len;
+    *len -= message->as.entry.file_path.len;
     *buffer += message->as.entry.file_path.len;
 
     if (*len < sizeof(u32))
       return false;
     message->as.entry.row = *(u32 *) *buffer;
-    *len += sizeof(u32);
+    *len -= sizeof(u32);
     *buffer += sizeof(u32);
 
     if (*len < sizeof(u32))
       return false;
     message->as.entry.col = *(u32 *) *buffer;
-    *len += sizeof(u32);
+    *len -= sizeof(u32);
     *buffer += sizeof(u32);
 
     if (*len < sizeof(u8))
       return false;
     message->as.entry.kind = (EntryKind) **buffer;
-    *len += sizeof(u8);
+    *len -= sizeof(u8);
     *buffer += sizeof(u8);
 
     if (*len < sizeof(u32))
       return false;
     message->as.entry.message.len = *(u32 *) *buffer;
-    *len += sizeof(u32);
+    *len -= sizeof(u32);
     *buffer += sizeof(u32);
 
     if (*len < message->as.entry.message.len)
@@ -52,7 +52,7 @@ bool decode_message(Message *message, u8 **buffer, u32 *len) {
     message->as.entry.message.ptr =
       malloc(message->as.entry.message.len * sizeof(*message->as.entry.message.ptr));
     memcpy(message->as.entry.message.ptr, *buffer, message->as.entry.message.len);
-    *len += message->as.entry.message.len;
+    *len -= message->as.entry.message.len;
     *buffer += message->as.entry.message.len;
   } break;
 
