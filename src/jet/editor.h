@@ -4,6 +4,7 @@
 #include "buffer.h"
 #include "provider.h"
 #include "highlighter.h"
+#include "searcher.h"
 #include "../common/protocol.h"
 #include "cns/cns.h"
 
@@ -25,6 +26,7 @@ typedef Da(MainBuffer) MainBuffers;
 typedef enum {
   JetModeEditor = 0,
   JetModeCommandPalette,
+  JetModeSearch,
 } JetMode;
 
 typedef struct {
@@ -39,6 +41,7 @@ typedef Da(Completion) Completions;
 struct Editor {
   MainBuffers main_buffers;
   Buffer      palette_buffer;
+  Buffer      search_buffer;
   u32         current_main_buffer_index;
 
   Provider       *provider;
@@ -66,6 +69,9 @@ struct Editor {
   u32         prev_cursor_row;
   u32         prev_current_main_buffer_index;
   f32         last_deduplication_time;
+
+  Searcher searcher;
+  f32      search_scroll_x;
 };
 
 MainBuffer    main_buffer_make(char *path);

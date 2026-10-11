@@ -11,6 +11,7 @@
 #include "editor.h"
 #include "buffer.h"
 #include "provider.h"
+#include "searcher.h"
 #include "platform.h"
 // Customize your editor here!
 #include "config.h"
@@ -183,6 +184,7 @@ i32 main(i32 argc, char **argv) {
   MainBuffer main_buffer = main_buffer_make(NULL);
   DA_APPEND(editor.main_buffers, main_buffer);
   editor.palette_buffer = buffer_make();
+  editor.search_buffer = buffer_make();
   editor.mode = JetModeEditor;
   editor.font_scale = DEFAULT_FONT_SCALE;
 
@@ -305,6 +307,9 @@ i32 main(i32 argc, char **argv) {
                   buffer_clear_line(&editor.palette_buffer);
                 }
               }
+            } else if (editor.mode == JetModeSearch) {
+              searcher_delete(&editor.searcher);
+              editor.mode = JetModeEditor;
             }
           }
         } break;
@@ -344,29 +349,36 @@ i32 main(i32 argc, char **argv) {
         } break;
 
         case WinxKeyCodeBackspace: {
-          if (CURRENT_BUFFER().cursor_col == 0) {
-            editor_update_inline_errors_before_action(&editor, ActionRemoveLineBeforeCursor);
-            editor_update_completions_before_action(&editor, ActionRemoveLineBeforeCursor, 0);
-            highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineBeforeCursor);
+          if (editor.mode == JetModeSearch) {
+            searcher_undo(&editor.searcher,
+                          &CURRENT_BUFFER().cursor_row,
+                          &CURRENT_BUFFER().cursor_col,
+                          &editor.search_buffer);
           } else {
-            u32 amount;
+            if (CURRENT_BUFFER().cursor_col == 0) {
+              editor_update_inline_errors_before_action(&editor, ActionRemoveLineBeforeCursor);
+              editor_update_completions_before_action(&editor, ActionRemoveLineBeforeCursor, 0);
+              highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineBeforeCursor);
+            } else {
+              u32 amount;
+              if (is_ctrl_pressed)
+                amount =
+                  buffer_get_chars_amount_for_remove_word_before_cursor(&CURRENT_BUFFER());
+              else
+                amount = 1;
+
+              editor_update_inline_errors_before_action(&editor, ActionRemoveBeforeCursor);
+              editor_update_completions_before_action(&editor, ActionRemoveBeforeCursor, amount);
+            }
+
             if (is_ctrl_pressed)
-              amount =
-                buffer_get_chars_amount_for_remove_word_before_cursor(&CURRENT_BUFFER());
+              buffer_remove_word_before_cursor(editor_current_buffer(&editor));
             else
-              amount = 1;
+              buffer_remove_before_cursor(editor_current_buffer(&editor));
 
-            editor_update_inline_errors_before_action(&editor, ActionRemoveBeforeCursor);
-            editor_update_completions_before_action(&editor, ActionRemoveBeforeCursor, amount);
+            editor_update_current_row_completions_begin(&editor);
+            highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
           }
-
-          if (is_ctrl_pressed)
-            buffer_remove_word_before_cursor(editor_current_buffer(&editor));
-          else
-            buffer_remove_before_cursor(editor_current_buffer(&editor));
-
-          editor_update_current_row_completions_begin(&editor);
-          highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
         } break;
 
         case WinxKeyCodeDelete: {
@@ -641,11 +653,47 @@ i32 main(i32 argc, char **argv) {
           }
         } break;
 
+        case WinxKeyCodeF: {
+          if (is_ctrl_pressed) {
+            if (is_shift_pressed) {
+              if (editor.mode == JetModeSearch) {
+                searcher_undo(&editor.searcher,
+                              &CURRENT_BUFFER().cursor_row,
+                              &CURRENT_BUFFER().cursor_col,
+                              &editor.search_buffer);
+              }
+            } else {
+              if (editor.mode == JetModeEditor) {
+                editor.mode = JetModeSearch;
+                searcher_init(&editor.searcher, &CURRENT_BUFFER());
+                buffer_clear_line(&editor.search_buffer);
+              } else if (editor.mode == JetModeSearch) {
+                searcher_next_match(&editor.searcher,
+                                    &CURRENT_BUFFER().cursor_row,
+                                    &CURRENT_BUFFER().cursor_col,
+                                    true);
+              }
+            }
+          }
+        } break;
+
         case WinxKeyCodeEscape: {
-          if (editor.mode == JetModeEditor)
+          if (editor.mode == JetModeEditor) {
             editor.completing = false;
-          else if (editor.mode == JetModeCommandPalette)
+          } else if (editor.mode == JetModeCommandPalette) {
             editor.mode = JetModeEditor;
+          } else if (editor.mode == JetModeSearch) {
+            bool iterated = false;
+            while (searcher_undo(&editor.searcher,
+                                 &CURRENT_BUFFER().cursor_row,
+                                 &CURRENT_BUFFER().cursor_col,
+                                 &editor.search_buffer))
+              iterated = true;
+            if (iterated)
+              ++CURRENT_BUFFER().cursor_col;
+            searcher_delete(&editor.searcher);
+            editor.mode = JetModeEditor;
+          }
         } break;
 
         case WinxKeyCodeSpace: {
@@ -684,6 +732,18 @@ i32 main(i32 argc, char **argv) {
             editor.completing = true;
           }
 #endif
+          if (editor.mode == JetModeSearch) {
+            WideStr line = buffer_get_current_line(&editor.search_buffer);
+            searcher_update_pattern(&editor.searcher, line);
+            if (CURRENT_BUFFER().cursor_col > 0)
+              --CURRENT_BUFFER().cursor_col;
+            if (!searcher_next_match(&editor.searcher,
+                                     &CURRENT_BUFFER().cursor_row,
+                                     &CURRENT_BUFFER().cursor_col,
+                                     line.len == 1) &&
+                CURRENT_BUFFER().cursor_col > 1)
+              ++CURRENT_BUFFER().cursor_col;
+          }
         }
       } break;
 
@@ -739,9 +799,15 @@ i32 main(i32 argc, char **argv) {
     }
     {
       u32 min_row, min_col, max_row, max_col;
-      get_buffer_selection_bounds(&editor.palette_buffer,
-                                  &min_row, &min_col,
-                                  &max_row, &max_col);
+      if (editor.mode == JetModeCommandPalette) {
+        get_buffer_selection_bounds(&editor.palette_buffer,
+                                    &min_row, &min_col,
+                                    &max_row, &max_col);
+      } else if (editor.mode == JetModeSearch) {
+        get_buffer_selection_bounds(&editor.search_buffer,
+                                    &min_row, &min_col,
+                                    &max_row, &max_col);
+      }
       tr_begin_frame(&ptr, editor.font_scale,
                      min_row, min_col,
                      max_row, max_col);
@@ -753,6 +819,11 @@ i32 main(i32 argc, char **argv) {
       get_buffer_selection_bounds(&CURRENT_BUFFER(),
                                   &min_row, &min_col,
                                   &max_row, &max_col);
+
+      if (editor.mode == JetModeSearch &&
+          searcher_has_succesful_searches_in_history(&editor.searcher))
+        max_col += editor.search_buffer.cursor_col - 1;
+
       tr_begin_frame(&tr, editor.font_scale,
                      min_row, min_col,
                      max_row, max_col);
@@ -978,18 +1049,17 @@ i32 main(i32 argc, char **argv) {
           tr_measure_text(&ptr, &space, 1);
       }
 
-      if (line0_width - editor.palette_scroll_x < 0.0) {
+      if (line0_width - editor.palette_scroll_x < 0.0)
         editor.palette_scroll_x = line0_width;
-      } else if (line1_width - editor.palette_scroll_x >
-                 window->width * PALETTE_WIDTH_FACTOR -
-                 PALETTE_BORDER_WIDTH * 2.0 -
-                 BUFFER_PADDING * 2.0) {
+      else if (line1_width - editor.palette_scroll_x >
+               window->width * PALETTE_WIDTH_FACTOR -
+               PALETTE_BORDER_WIDTH * 2.0 -
+               BUFFER_PADDING * 2.0)
         editor.palette_scroll_x =
           line1_width -
           (window->width * PALETTE_WIDTH_FACTOR -
            PALETTE_BORDER_WIDTH * 2.0 -
            BUFFER_PADDING * 2.0);
-      }
 
       tr_draw_line(&ptr, line.ptr, line.len,
                    window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH - editor.palette_scroll_x,
@@ -1027,12 +1097,56 @@ i32 main(i32 argc, char **argv) {
 
         tr_draw_text(&ptr, option->name.ptr, option->name.len, x, y);
       }
+    } else if (editor.mode == JetModeSearch) {
+      tr_set_bg_color(&ptr, ALT_BG_COLOR);
+      tr_set_fg_color(&ptr, ALT_FG_COLOR);
+
+      ptr.x_lower_limit = BUFFER_PADDING;
+      ptr.x_higher_limit = window->width - BUFFER_PADDING;
+
+      WideStr line = buffer_get_current_line(&editor.search_buffer);
+
+      f32 line0_width =
+        tr_measure_text(&ptr, line.ptr, editor.search_buffer.cursor_col);
+
+      f32 line1_width;
+      if (editor.search_buffer.cursor_col < line.len) {
+        line1_width =
+          tr_measure_text(&ptr, line.ptr, editor.search_buffer.cursor_col + 1);
+      } else {
+        u32 space = U' ';
+        line1_width =
+          tr_measure_text(&ptr, line.ptr, editor.search_buffer.cursor_col) +
+          tr_measure_text(&ptr, &space, 1);
+      }
+
+      if (line0_width - editor.search_scroll_x < 0.0)
+        editor.search_scroll_x = line0_width;
+      else if (line1_width - editor.search_scroll_x >
+               window->width - BUFFER_PADDING)
+        editor.search_scroll_x = line1_width - (window->width - BUFFER_PADDING);
+
+      f32 y = window->height - ((f32) editor.font_scale + BUFFER_PADDING);
+
+      sr_draw_rect(&sr,
+                   0.0,
+                   y,
+                   window->width,
+                   (f32) editor.font_scale + BUFFER_PADDING,
+                   ALT_BG_COLOR, 1.0);
+
+      y += BUFFER_PADDING * 0.5;
+
+      f32 x = BUFFER_PADDING - editor.search_scroll_x;
+
+      tr_draw_line(&ptr, line.ptr, line.len, x, y, INFINITY, NULL);
     }
 
-    // Rendering status bar
-    {
-      str.x_lower_limit = 0.0;
-      str.x_higher_limit = window->width;
+    if (editor.mode != JetModeSearch) {
+      // Rendering status bar
+
+      str.x_lower_limit = BUFFER_PADDING;
+      str.x_higher_limit = window->width - BUFFER_PADDING;
 
       tr_set_bg_color(&str, ALT_BG_COLOR);
       tr_set_fg_color(&str, ALT_FG_COLOR);
@@ -1134,6 +1248,7 @@ i32 main(i32 argc, char **argv) {
     if (editor.actual_completions[i].items)
       free(editor.actual_completions[i].items);
   buffer_delete(&editor.palette_buffer);
+  buffer_delete(&editor.search_buffer);
   for (u32 i = 0; i < editor.main_buffers.len; ++i) {
     buffer_delete(&editor.main_buffers.items[i].buffer);
     if (editor.main_buffers.items[i].file_path)
