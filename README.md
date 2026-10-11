@@ -8,7 +8,7 @@ Jet is a lightweight text/code editor, written from scratch in C using Vulkan an
 
 ## Advanced features
 
-Apart from basic editing features, jwrap has these additional ones:
+Apart from basic editing features, Jet has these additional ones:
 
 - jwrap: after launching Jet, run jwrap with your compilation command. Jet will get all errors/warnings/infos, display them in a separate menu and inline. On save - automatic re-run.
 - Autocompletion: collects words from all open buffers, dynamically updates, works fine on a file with 36938 lines of code and many prefix duplications.
