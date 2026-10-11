@@ -39,7 +39,7 @@ void   buffer_goto_line_begin(Buffer *buffer, bool is_selecting);
 void   buffer_goto_line_end(Buffer *buffer, bool is_selecting);
 void   buffer_goto_buffer_begin(Buffer *buffer, bool is_selecting);
 void   buffer_goto_buffer_end(Buffer *buffer, bool is_selecting);
-void   buffer_remove_line(Buffer *buffer);
+void   buffer_clear_line(Buffer *buffer);
 void   buffer_delete(Buffer *buffer);
 
 void buffer_read_file(Buffer *buffer, char *path);

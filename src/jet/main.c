@@ -293,7 +293,7 @@ i32 main(i32 argc, char **argv) {
                 if (editor.provider->execute(&editor, editor.options, editor.selected_option)) {
                   editor.mode = JetModeEditor;
                 } else {
-                  buffer_remove_line(&editor.palette_buffer);
+                  buffer_clear_line(&editor.palette_buffer);
                 }
               }
             }
@@ -324,7 +324,7 @@ i32 main(i32 argc, char **argv) {
               }
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
-                buffer_remove_line(editor_current_buffer(&editor));
+                buffer_clear_line(editor_current_buffer(&editor));
                 PaletteOption *option = editor.options.items + editor.selected_option;
                 for (u32 i = 0; i < option->name.len; ++i)
                   buffer_insert(editor_current_buffer(&editor), option->name.ptr[i]);
@@ -522,7 +522,7 @@ i32 main(i32 argc, char **argv) {
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
               editor.completing = false;
-              buffer_remove_line(editor_current_buffer(&editor));
+              buffer_clear_line(editor_current_buffer(&editor));
             } else if (editor.mode == JetModeCommandPalette) {
               editor.mode = JetModeEditor;
             }
@@ -550,7 +550,7 @@ i32 main(i32 argc, char **argv) {
               editor.selected_option = editor.entry_cursor;
               editor.mode = JetModeCommandPalette;
               editor.completing = false;
-              buffer_remove_line(editor_current_buffer(&editor));
+              buffer_clear_line(editor_current_buffer(&editor));
             } else if (editor.mode == JetModeCommandPalette) {
               editor.mode = JetModeEditor;
             }
@@ -563,7 +563,7 @@ i32 main(i32 argc, char **argv) {
             editor.selected_option = 0;
             editor.mode = JetModeCommandPalette;
             editor.completing = false;
-            buffer_remove_line(editor_current_buffer(&editor));
+            buffer_clear_line(editor_current_buffer(&editor));
           }
         } break;
 
@@ -574,7 +574,7 @@ i32 main(i32 argc, char **argv) {
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
               editor.completing = false;
-              buffer_remove_line(editor_current_buffer(&editor));
+              buffer_clear_line(editor_current_buffer(&editor));
             } else {
               Str abs_file_path = CURRENT_ABS_FILE_PATH();
               char *abs_file_path_cstr = malloc(abs_file_path.len + 1);

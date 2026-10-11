@@ -10,13 +10,20 @@ static PaletteOptions get_opts(Editor *editor, WideStr content) {
   result.len = 1;
   result.cap = result.len;
   result.items = malloc(result.cap * sizeof(*result.items));
-  result.items[0] = (PaletteOption) { content, BG_COLOR, FG_COLOR };
+  result.items[0] = (PaletteOption) { {}, BG_COLOR, FG_COLOR };
+  result.items[0].name.len = content.len;
+  result.items[0].name.ptr =
+    malloc(result.items[0].name.len * sizeof(*result.items[0].name.ptr));
+  memcpy(result.items[0].name.ptr, content.ptr,
+         result.items[0].name.len * sizeof(*result.items[0].name.ptr));
   return result;
 }
 
 static void free_opts(PaletteOptions options) {
-  if (options.len > 0)
+  if (options.len > 0) {
+    free(options.items[0].name.ptr);
     free(options.items);
+  }
 }
 
 static bool execute(Editor *editor, PaletteOptions options, u32 index) {

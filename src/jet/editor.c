@@ -277,7 +277,8 @@ void editor_update_current_row_completions_begin(Editor *editor) {
     editor->prev_cursor_row = main_buffer->buffer.cursor_row;
   } else if (editor->prev_cursor_row > main_buffer->buffer.cursor_row) {
     while (editor->current_row_completions_begin > 0 &&
-           (editor->completions.items[editor->current_row_completions_begin].row >
+           (editor->current_row_completions_begin >= editor->completions.len ||
+            editor->completions.items[editor->current_row_completions_begin].row >
             main_buffer->buffer.cursor_row ||
             !str_eq(editor->completions.items[editor->current_row_completions_begin].abs_file_path,
                     main_buffer->abs_file_path)))

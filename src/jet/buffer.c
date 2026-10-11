@@ -478,7 +478,7 @@ void buffer_goto_buffer_end(Buffer *buffer, bool is_selecting) {
   buffer->desired_col = buffer->cursor_col;
 }
 
-void buffer_remove_line(Buffer *buffer) {
+void buffer_clear_line(Buffer *buffer) {
   Line *line = buffer->lines.items + buffer->cursor_row;
   line->len = 0;
   buffer->cursor_col = 0;
@@ -585,16 +585,18 @@ u32 buffer_get_rows(Buffer *buffer) {
 WideStr buffer_get_word_at_cursor(Buffer *buffer) {
   WideStr result = buffer_get_current_line(buffer);
   u32 line_len = result.len;
-  result.ptr += buffer->cursor_col;
+  u32 offset = buffer->cursor_col;
+  result.ptr += offset;
   result.len = 0;
 
   while (result.len < buffer->cursor_col &&
          is_part_of_word(result.ptr[-1])) {
+    --offset;
     --result.ptr;
     ++result.len;
   }
 
-  while (result.len < line_len &&
+  while (offset + result.len < line_len &&
          is_part_of_word(result.ptr[result.len]))
     ++result.len;
 
