@@ -48,6 +48,7 @@ static Keyword keywords[] = {
   { WSTR_LIT(U"void"), TYPE_COLOR },
   { WSTR_LIT(U"volatile"), KW_COLOR },
   { WSTR_LIT(U"while"), KW_COLOR },
+  { WSTR_LIT(U"bool"), TYPE_COLOR },
 };
 
 static WideStr strs[] = { WSTR_LIT(U"\""), WSTR_LIT(U"'") };
