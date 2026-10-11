@@ -237,15 +237,16 @@ void highlighter_redo_line(MainBuffer *buffer, u32 row) {
 void highlighter_update_before_action(MainBuffer *buffer, Action action) {
   switch (action) {
   case ActionAddLine: {
-    if (buffer->buffer.cursor_row < buffer->highlighter.states.len)
+    if (buffer->buffer.cursor_row < buffer->highlighter.states.len) {
       DA_INSERT(buffer->highlighter.states,
                 buffer->buffer.cursor_row,
                 buffer->highlighter.states.items[buffer->buffer.cursor_row + 1]);
-    else
-      DA_INSERT(buffer->highlighter.states,
-                buffer->buffer.cursor_row,
+      DA_INSERT(buffer->highlighter.rangess, buffer->buffer.cursor_row, (ColorRanges) {0});
+    } else {
+      DA_APPEND(buffer->highlighter.states,
                 ((HighlighterState) { HighlighterStateKindBasic, {} }));
-    DA_INSERT(buffer->highlighter.rangess, buffer->buffer.cursor_row, (ColorRanges) {0});
+      DA_APPEND(buffer->highlighter.rangess, (ColorRanges) {0});
+    }
   } break;
 
   case ActionRemoveLineBeforeCursor:
