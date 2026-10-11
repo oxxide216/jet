@@ -118,6 +118,7 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
     if (main_buffer.buffer.cursor_col > line.len)
       main_buffer.buffer.cursor_col = line.len;
     DA_APPEND(editor->main_buffers, main_buffer);
+    editor_build_completions(editor, editor->main_buffers.len - 1);
   } else {
     editor->current_main_buffer_index = main_buffer_index;
     Buffer *buffer = &editor->main_buffers.items[editor->current_main_buffer_index].buffer;
