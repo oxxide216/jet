@@ -189,6 +189,14 @@ i32 main(i32 argc, char **argv) {
   if (argc > 1) {
     buffer_read_file(editor_current_buffer(&editor), argv[1]);
     editor.main_buffers.items[0].file_path = strdup(argv[1]);
+
+    StringBuilder sb = {0};
+    Str cwd = get_current_dir();
+    sb_push_str(&sb, cwd);
+    free(cwd.ptr);
+    sb_push(&sb, argv[1]);
+    editor.main_buffers.items[0].abs_file_path = sb_to_str(sb);
+
     editor_build_completions(&editor, 0);
     highlighter_do_main_buffer(editor.main_buffers.items);
 

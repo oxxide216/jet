@@ -1,6 +1,7 @@
 #include "../provider.h"
 #include "../editor.h"
 #include "../buffer.h"
+#include "../platform.h"
 #include "../config.h"
 
 static PaletteOptions get_opts(Editor *editor, WideStr content) {
@@ -33,8 +34,16 @@ static bool execute(Editor *editor, PaletteOptions options, u32 index) {
   MainBuffer *current_buffer = editor->main_buffers.items + editor->current_main_buffer_index;
   char *path = wide_str_to_cstr(buffer_get_current_line(editor_current_buffer(editor)));
   buffer_write_file(&current_buffer->buffer, path);
-  highlighter_do_main_buffer(current_buffer);
   current_buffer->file_path = path;
+
+  StringBuilder sb = {0};
+  Str cwd = get_current_dir();
+  sb_push_str(&sb, cwd);
+  free(cwd.ptr);
+  sb_push(&sb, path);
+  current_buffer->abs_file_path = sb_to_str(sb);
+
+  highlighter_do_main_buffer(current_buffer);
 
   if (editor->jwrap) {
     ByteBuffer buffer = {0};
