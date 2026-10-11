@@ -194,6 +194,7 @@ i32 main(i32 argc, char **argv) {
     Str cwd = get_current_dir();
     sb_push_str(&sb, cwd);
     free(cwd.ptr);
+    sb_push_char(&sb, '/');
     sb_push(&sb, argv[1]);
     editor.main_buffers.items[0].abs_file_path = sb_to_str(sb);
 

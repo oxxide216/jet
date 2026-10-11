@@ -40,6 +40,7 @@ static bool execute(Editor *editor, PaletteOptions options, u32 index) {
   Str cwd = get_current_dir();
   sb_push_str(&sb, cwd);
   free(cwd.ptr);
+  sb_push_char(&sb, '/');
   sb_push(&sb, path);
   current_buffer->abs_file_path = sb_to_str(sb);
 
