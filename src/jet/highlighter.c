@@ -90,61 +90,6 @@ void highlighter_redo_line(MainBuffer *buffer, u32 row) {
 
       switch (state.kind) {
       case HighlighterStateKindBasic: {
-        bool found = false;
-
-        for (u32 j = 0; j < buffer->highlighter.info->keywords_len; ++j) {
-          Keyword *keyword = buffer->highlighter.info->keywords + j;
-          if ((i > 0 && is_part_of_word(line.ptr[i - 1])) ||
-              (i + keyword->str.len < line.len &&
-               is_part_of_word(line.ptr[i + keyword->str.len])))
-            continue;
-
-          if (wide_str_begins_with(sub_line, keyword->str)) {
-            ColorRange range = {
-              i,
-              i + keyword->str.len,
-              keyword->r,
-              keyword->g,
-              keyword->b,
-            };
-            DA_APPEND(*ranges, range);
-
-            i += keyword->str.len - 1;
-
-            found = true;
-
-            break;
-          }
-        }
-
-        if (found)
-          break;
-
-        for (u32 j = 0; j < buffer->highlighter.info->str_kinds_len; ++j) {
-          WideStr begin = buffer->highlighter.info->str_begins[j];
-
-          if (wide_str_begins_with(sub_line, begin)) {
-            state.kind = HighlighterStateKindString;
-            state.str_end_index = j;
-
-            ColorRange range = {
-              i,
-              i + begin.len,
-              STRING_COLOR,
-            };
-            DA_APPEND(*ranges, range);
-
-            i += begin.len - 1;
-
-            found = true;
-
-            break;
-          }
-        }
-
-        if (found)
-          break;
-
         WideStr begin = buffer->highlighter.info->sl_comment_begin;
         if (wide_str_begins_with(sub_line, begin)) {
           state.kind = HighlighterStateKindSLComment;
@@ -176,6 +121,56 @@ void highlighter_redo_line(MainBuffer *buffer, u32 row) {
           i += begin.len - 1;
 
           break;
+        }
+
+        bool found = false;
+
+        for (u32 j = 0; j < buffer->highlighter.info->str_kinds_len; ++j) {
+          WideStr begin = buffer->highlighter.info->str_begins[j];
+
+          if (wide_str_begins_with(sub_line, begin)) {
+            state.kind = HighlighterStateKindString;
+            state.str_end_index = j;
+
+            ColorRange range = {
+              i,
+              i + begin.len,
+              STRING_COLOR,
+            };
+            DA_APPEND(*ranges, range);
+
+            i += begin.len - 1;
+
+            found = true;
+
+            break;
+          }
+        }
+
+        if (found)
+          break;
+
+        for (u32 j = 0; j < buffer->highlighter.info->keywords_len; ++j) {
+          Keyword *keyword = buffer->highlighter.info->keywords + j;
+          if ((i > 0 && is_part_of_word(line.ptr[i - 1])) ||
+              (i + keyword->str.len < line.len &&
+               is_part_of_word(line.ptr[i + keyword->str.len])))
+            continue;
+
+          if (wide_str_begins_with(sub_line, keyword->str)) {
+            ColorRange range = {
+              i,
+              i + keyword->str.len,
+              keyword->r,
+              keyword->g,
+              keyword->b,
+            };
+            DA_APPEND(*ranges, range);
+
+            i += keyword->str.len - 1;
+
+            break;
+          }
         }
       } break;
 
