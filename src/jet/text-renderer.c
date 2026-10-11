@@ -264,7 +264,22 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len,
 
   u32 last_wrap_i = 0;
 
+  tr->current_range_index = 0;
+  tr->current_range = NULL;
+
   for (u32 i = 0; i < text_len; ++i) {
+    if (tr->current_range && i >= tr->current_range->end) {
+      ++tr->current_range_index;
+      tr->current_range = NULL;
+    }
+
+    if (!tr->current_range && tr->line_index < tr->rangess.len) {
+      ColorRanges *line_ranges = tr->rangess.items + tr->line_index;
+      if (tr->current_range_index < line_ranges->len &&
+          i >= line_ranges->items[tr->current_range_index].begin)
+        tr->current_range = line_ranges->items + tr->current_range_index;
+    }
+
     if (tr->line_index == tr->sel_end_row && i + 1 == tr->sel_end_col) {
       tr->sel_end_x = x;
       tr->sel_end_y = y;
@@ -283,9 +298,21 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len,
       (tr->line_index == tr->sel_end_row &&
        tr->line_index != tr->sel_begin_row &&
        i < tr->sel_end_col);
-    f32 r = is_selected ? tr->bg_r : tr->fg_r;
-    f32 g = is_selected ? tr->bg_g : tr->fg_g;
-    f32 b = is_selected ? tr->bg_b : tr->fg_b;
+    f32 r, g, b;
+    if (is_selected) {
+      r = tr->bg_r;
+      g = tr->bg_g;
+      b = tr->bg_b;
+    } else if (tr->current_range) {
+      r = tr->current_range->r;
+      g = tr->current_range->g;
+      b = tr->current_range->b;
+    } else {
+      r = tr->fg_r;
+      g = tr->fg_g;
+      b = tr->fg_b;
+    }
+
     TextSSBOEntry text_entry = {
       x, y,       // Modified by get_char_data
       10.0, 10.0, // Overwritten by get_char_data

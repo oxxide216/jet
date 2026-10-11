@@ -40,13 +40,27 @@
 #define COMPLETIONS_WINDOW_BORDER_WIDTH 2.0
 
 // Colors
-#define BG_COLOR     0x18/255.0, 0x18/255.0, 0x18/255.0
-#define FG_COLOR     0x86/255.0, 0x8a/255.0, 0xac/255.0
-#define ACC_COLOR    0x82/255.0, 0x53/255.0, 0xa1/255.0
-#define ALT_BG_COLOR 0x6a/255.0, 0x7c/255.0, 0x93/255.0
-#define ALT_FG_COLOR 0x18/255.0, 0x18/255.0, 0x18/255.0
-#define ERROR_COLOR  0xb5/255.0, 0x40/255.0, 0x36/255.0
-#define WARN_COLOR   0xde/255.0, 0xb5/255.0, 0x66/255.0
-#define INFO_COLOR   0x5a/255.0, 0xb9/255.0, 0x77/255.0
+#define BG_COLOR      0x18/255.0, 0x18/255.0, 0x18/255.0
+#define FG_COLOR      0x86/255.0, 0x8a/255.0, 0xac/255.0
+#define ACC_COLOR     0x82/255.0, 0x53/255.0, 0xa1/255.0
+#define ALT_BG_COLOR  0x6a/255.0, 0x7c/255.0, 0x93/255.0
+#define ALT_FG_COLOR  0x18/255.0, 0x18/255.0, 0x18/255.0
+#define ERROR_COLOR   0xb5/255.0, 0x40/255.0, 0x36/255.0
+#define WARN_COLOR    0xde/255.0, 0xb5/255.0, 0x66/255.0
+#define INFO_COLOR    0x5a/255.0, 0xb9/255.0, 0x77/255.0
+#define BLACK_COLOR   0x23/255.0, 0x25/255.0, 0x2b/255.0
+#define RED_COLOR     0xb5/255.0, 0x40/255.0, 0x36/255.0
+#define GREEN_COLOR   0x5a/255.0, 0xb9/255.0, 0x77/255.0
+#define YELLOW_COLOR  0xde/255.0, 0xb5/255.0, 0x66/255.0
+#define GREY_COLOR    0x6a/255.0, 0x7c/255.0, 0x93/255.0
+#define MAGENTA_COLOR 0x82/255.0, 0x53/255.0, 0xa1/255.0
+#define CYAN_COLOR    0x3f/255.0, 0x94/255.0, 0xa8/255.0
+#define WHITE_COLOR   0xeb/255.0, 0xed/255.0, 0xf2/255.0
+// Specific theme
+#define KW_COLOR      MAGENTA_COLOR
+#define ALT_KW_COLOR  CYAN_COLOR
+#define TYPE_COLOR    YELLOW_COLOR
+#define STRING_COLOR  GREEN_COLOR
+#define COMMENT_COLOR GREY_COLOR
 
 #endif // CONFIG_H

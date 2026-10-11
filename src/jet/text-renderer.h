@@ -4,6 +4,7 @@
 #include "winx/winx.h"
 #include "viking/viking.h"
 #include "stb_truetype.h"
+#include "highlighter.h"
 #include "config.h"
 
 typedef struct {
@@ -83,6 +84,9 @@ typedef struct {
   f32             x_lower_limit;
   f32             x_higher_limit;
   u32             line_index;
+  ColorRangess    rangess;
+  u32             current_range_index;
+  ColorRange     *current_range;
   bool            is_glyphs_cache_dirty;
   bool            is_ubo_data_dirty;
 } TextRenderer;

@@ -1,0 +1,66 @@
+#include "../highlighter.h"
+#include "../config.h"
+
+static Str file_extensions[] = { STR_LIT(".c"), STR_LIT(".h") };
+
+static Keyword keywords[] = {
+  { WSTR_LIT(U"#include"), ALT_KW_COLOR },
+  { WSTR_LIT(U"#define"), ALT_KW_COLOR },
+  { WSTR_LIT(U"#undef"), ALT_KW_COLOR },
+  { WSTR_LIT(U"#if"), ALT_KW_COLOR },
+  { WSTR_LIT(U"#ifdef"), ALT_KW_COLOR },
+  { WSTR_LIT(U"#ifndef"), ALT_KW_COLOR },
+  { WSTR_LIT(U"#else"), ALT_KW_COLOR },
+  { WSTR_LIT(U"#elif"), ALT_KW_COLOR },
+  { WSTR_LIT(U"#endif"), ALT_KW_COLOR },
+  { WSTR_LIT(U"#error"), ALT_KW_COLOR },
+  { WSTR_LIT(U"#pragma"), ALT_KW_COLOR },
+  { WSTR_LIT(U"auto"), KW_COLOR },
+  { WSTR_LIT(U"break"), KW_COLOR },
+  { WSTR_LIT(U"case"), KW_COLOR },
+  { WSTR_LIT(U"char"), TYPE_COLOR },
+  { WSTR_LIT(U"const"), KW_COLOR },
+  { WSTR_LIT(U"continue"), KW_COLOR },
+  { WSTR_LIT(U"default"), KW_COLOR },
+  { WSTR_LIT(U"do"), KW_COLOR },
+  { WSTR_LIT(U"double"), KW_COLOR },
+  { WSTR_LIT(U"else"), KW_COLOR },
+  { WSTR_LIT(U"enum"), KW_COLOR },
+  { WSTR_LIT(U"extern"), KW_COLOR },
+  { WSTR_LIT(U"float"), TYPE_COLOR },
+  { WSTR_LIT(U"for"), KW_COLOR },
+  { WSTR_LIT(U"goto"), KW_COLOR },
+  { WSTR_LIT(U"if"), KW_COLOR },
+  { WSTR_LIT(U"inline"), KW_COLOR },
+  { WSTR_LIT(U"int"), TYPE_COLOR },
+  { WSTR_LIT(U"long"), TYPE_COLOR },
+  { WSTR_LIT(U"register"), KW_COLOR },
+  { WSTR_LIT(U"return"), KW_COLOR },
+  { WSTR_LIT(U"short"), TYPE_COLOR },
+  { WSTR_LIT(U"signed"), TYPE_COLOR },
+  { WSTR_LIT(U"sizeof"), KW_COLOR },
+  { WSTR_LIT(U"static"), KW_COLOR },
+  { WSTR_LIT(U"struct"), KW_COLOR },
+  { WSTR_LIT(U"switch"), KW_COLOR },
+  { WSTR_LIT(U"typedef"), KW_COLOR },
+  { WSTR_LIT(U"union"), KW_COLOR },
+  { WSTR_LIT(U"unsigned"), TYPE_COLOR },
+  { WSTR_LIT(U"void"), TYPE_COLOR },
+  { WSTR_LIT(U"volatile"), KW_COLOR },
+  { WSTR_LIT(U"while"), KW_COLOR },
+};
+
+static WideStr strs[] = { WSTR_LIT(U"\""), WSTR_LIT(U"'") };
+
+HighlighterInfo c_highlighter_info = {
+  .file_extensions = file_extensions,
+  .file_extensions_len = ARRAY_LEN(file_extensions),
+  .keywords = keywords,
+  .keywords_len = ARRAY_LEN(keywords),
+  .str_begins = strs,
+  .str_ends = strs,
+  .str_kinds_len = ARRAY_LEN(strs),
+  .sl_comment_begin = WSTR_LIT(U"//"),
+  .ml_comment_begin = WSTR_LIT(U"/*"),
+  .ml_comment_end = WSTR_LIT(U"*/"),
+};

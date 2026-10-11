@@ -6,6 +6,8 @@
 #include "shl/shl-defs.h"
 #include "shl/shl-str.h"
 
+#define WSTR_LIT(lit) ((WideStr) { lit, ARRAY_LEN(lit) - 1 })
+
 typedef struct {
   u32 *ptr;
   u32  len;
@@ -17,6 +19,16 @@ typedef Da(u32) WideStringBuilder;
 
 typedef Da(u32) Indices;
 
+typedef enum {
+  ActionAddLine = 0,
+  ActionRemoveLineBeforeCursor,
+  ActionRemoveLineAfterCursor,
+  ActionAdd,
+  ActionRemoveBeforeCursor,
+  ActionRemoveAfterCursor,
+} Action;
+
+bool      str_ends_with(Str str, Str postfix);
 bool      wide_str_begins_with(WideStr str, WideStr prefix);
 WideStrs  wide_strs_select_prefixed(WideStrs strs, WideStr content);
 WideStr   wide_str_dup(WideStr str);

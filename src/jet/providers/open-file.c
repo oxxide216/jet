@@ -5,6 +5,7 @@
 
 #include "../provider.h"
 #include "../editor.h"
+#include "../highlighter.h"
 #include "../config.h"
 
 static PaletteOptions get_opts(Editor *editor, WideStr content) {
@@ -50,6 +51,7 @@ static bool execute(Editor *editor, PaletteOptions options, u32 index) {
     MainBuffer main_buffer = main_buffer_make(path);
     buffer_read_file(&main_buffer.buffer, path);
     main_buffer_rebuild_entries(&main_buffer, editor);
+    highlighter_do_main_buffer(&main_buffer);
     DA_APPEND(editor->main_buffers, main_buffer);
     editor_build_completions(editor, editor->main_buffers.len - 1);
     editor->completing = false;

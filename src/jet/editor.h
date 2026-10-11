@@ -3,12 +3,13 @@
 
 #include "buffer.h"
 #include "provider.h"
+#include "highlighter.h"
 #include "../common/protocol.h"
 #include "cns/cns.h"
 
 typedef Da(MessageEntry *) MessageEntryPtrs;
 
-typedef struct {
+struct MainBuffer {
   Buffer            buffer;
   u32               scroll;
   char             *file_path;
@@ -16,7 +17,8 @@ typedef struct {
   MessageEntryPtrs  errors;
   MessageEntryPtrs  warnings;
   MessageEntryPtrs  infos;
-} MainBuffer;
+  Highlighter       highlighter;
+};
 
 typedef Da(MainBuffer) MainBuffers;
 
@@ -33,15 +35,6 @@ typedef struct {
 } Completion;
 
 typedef Da(Completion) Completions;
-
-typedef enum {
-  ActionAddLine = 0,
-  ActionRemoveLineBeforeCursor,
-  ActionRemoveLineAfterCursor,
-  ActionAdd,
-  ActionRemoveBeforeCursor,
-  ActionRemoveAfterCursor,
-} Action;
 
 struct Editor {
   MainBuffers main_buffers;

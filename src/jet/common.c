@@ -9,6 +9,17 @@
 
 static u8 offset_table[3] = { 7, 5, 4 };
 
+bool str_ends_with(Str str, Str postfix) {
+  if (str.len < postfix.len)
+    return false;
+
+  for (u32 i = 0; i < postfix.len; ++i)
+    if (towlower(str.ptr[str.len - postfix.len + i]) != towlower(postfix.ptr[i]))
+      return false;
+
+  return true;
+}
+
 bool wide_str_begins_with(WideStr str, WideStr prefix) {
   if (str.len < prefix.len)
     return false;

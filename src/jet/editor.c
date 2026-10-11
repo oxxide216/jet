@@ -14,7 +14,7 @@ MainBuffer main_buffer_make(char *path) {
     memcpy(abs_path.ptr + cwd.len + 1, path, path_len * sizeof(*path));
     free(cwd.ptr);
   }
-  return (MainBuffer) { buffer_make(), 0.0, path, abs_path, {}, {}, {} };
+  return (MainBuffer) { buffer_make(), 0.0, path, abs_path, {}, {}, {}, {} };
 }
 
 void main_buffer_rebuild_entries(MainBuffer *buffer, Editor *editor) {
