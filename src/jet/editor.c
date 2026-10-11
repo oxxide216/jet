@@ -109,6 +109,7 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
     MainBuffer main_buffer = main_buffer_make(new_rel_path);
     buffer_read_file(&main_buffer.buffer, path);
     main_buffer_rebuild_entries(&main_buffer, editor);
+    highlighter_do_main_buffer(&main_buffer);
     main_buffer.buffer.cursor_row = entry->row - 1;
     if (main_buffer.buffer.cursor_row > buffer_get_rows(&main_buffer.buffer))
       main_buffer.buffer.cursor_row = buffer_get_rows(&main_buffer.buffer);
