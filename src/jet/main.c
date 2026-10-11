@@ -689,7 +689,7 @@ i32 main(i32 argc, char **argv) {
                                  &CURRENT_BUFFER().cursor_col,
                                  &editor.search_buffer))
               iterated = true;
-            if (iterated)
+            if (iterated && CURRENT_BUFFER().cursor_col > 0)
               ++CURRENT_BUFFER().cursor_col;
             searcher_delete(&editor.searcher);
             editor.mode = JetModeEditor;
@@ -718,13 +718,16 @@ i32 main(i32 argc, char **argv) {
 
       case WinxEventKindChar: {
         if (!is_ctrl_pressed && !is_alt_pressed) {
-          editor_update_inline_errors_before_action(&editor, ActionAdd);
-          editor_update_completions_before_action(&editor, ActionAdd,
-                                                  event.as._char._char);
+          if (editor.mode == JetModeEditor) {
+            editor_update_inline_errors_before_action(&editor, ActionAdd);
+            editor_update_completions_before_action(&editor, ActionAdd,
+                                                    event.as._char._char);
+          }
 
           buffer_insert(editor_current_buffer(&editor), event.as._char._char);
 
-          highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
+          if (editor.mode == JetModeEditor)
+            highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
 #if AUTOCOMPLETION
           if (editor.mode == JetModeEditor) {
             if (!editor.completing)
