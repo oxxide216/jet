@@ -576,7 +576,12 @@ i32 main(i32 argc, char **argv) {
               editor.completing = false;
               buffer_remove_line(editor_current_buffer(&editor));
             } else {
-              buffer_write_file(editor_current_buffer(&editor), CURRENT_FILE_PATH());
+              Str abs_file_path = CURRENT_ABS_FILE_PATH();
+              char *abs_file_path_cstr = malloc(abs_file_path.len + 1);
+              memcpy(abs_file_path_cstr, abs_file_path.ptr, abs_file_path.len);
+              abs_file_path_cstr[abs_file_path.len] = '\0';
+              buffer_write_file(editor_current_buffer(&editor), abs_file_path_cstr);
+              free(abs_file_path_cstr);
 
               if (editor.jwrap) {
                 ByteBuffer buffer = {0};
