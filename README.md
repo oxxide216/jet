@@ -12,7 +12,7 @@ Apart from basic editing features, Jet has these additional ones:
 
 - jwrap: after launching Jet, run jwrap with your compilation command. Jet will get all errors/warnings/infos, display them in a separate menu and inline. On save - automatic re-run.
 - Autocompletion: collects words from all open buffers, dynamically updates, works fine on a file with 36938 lines of code and many prefix duplications.
-- Incremental syntax highlighting: fast and easily extendable (but right now only for C)
+- Incremental syntax highlighting: fast and easily extendable (but right now only for C and Rust)
 - Fast incremental search: works just fine even on the same big file from autocompletion test
 
 ## Quick start
