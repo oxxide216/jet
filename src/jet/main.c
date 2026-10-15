@@ -608,7 +608,7 @@ i32 main(i32 argc, char **argv) {
                 ByteBuffer buffer = {0};
                 Message message = { MessageKindRerun, {} };
                 encode_message(&buffer, &message);
-                while (!cns_unix_send(editor.jwrap, buffer.items, buffer.len))
+                cns_unix_send(editor.jwrap, buffer.items, buffer.len);
                 free(buffer.items);
               }
             }
