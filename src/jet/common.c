@@ -122,6 +122,11 @@ WideStr str_to_wide_str(Str str) {
   };
 }
 
+void wsb_push_wstr(WideStringBuilder *wsb, WideStr str) {
+  for (u32 i = 0; i < str.len; ++i)
+    DA_APPEND(*wsb, str.ptr[i]);
+}
+
 void wsb_push_str(WideStringBuilder *wsb, Str str) {
   u32 wlen = 0;
   for (u32 i = 0; i < str.len; ++i)

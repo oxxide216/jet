@@ -90,5 +90,8 @@ void          editor_update_completions_before_action(Editor *editor,
 void          editor_remove_invalidated_completions(Editor *editor,
                                                     Str invalidated_abs_file_path);
 u32           editor_get_bucket_index(Editor *editor, WideStr str);
+void          editor_update_before_buffer_action(Editor *editor,
+                                                 BufferAction *action,
+                                                 bool is_redo);
 
 #endif // EDITOR_H

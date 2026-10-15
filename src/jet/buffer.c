@@ -7,6 +7,7 @@
 
 Buffer buffer_make(void) {
   Buffer buffer = {0};
+  buffer.is_recording_undos = true;
   DA_APPEND(buffer.lines, (Line) {0});
   return buffer;
 }
@@ -17,6 +18,8 @@ void buffer_reset(Buffer *buffer) {
       free(buffer->lines.items[i].items);
   buffer->lines.len = 1;
   buffer->lines.items[0].len = 0;
+  buffer->undos.len = 0;
+  buffer->redos.len = 0;
   buffer->anchor_row = 0;
   buffer->anchor_col = 0;
   buffer->cursor_row = 0;
@@ -60,6 +63,91 @@ static void merge_line_down(Buffer *buffer, u32 index) {
   DA_REMOVE_AT(buffer->lines, index + 1);
 }
 
+static void buffer_add_undo(Buffer *buffer, BufferActionKind kind, WideStr data,
+                            u32 cursor_row, u32 cursor_col) {
+  if (!buffer->is_recording_undos) {
+    if (data.ptr)
+      free(data.ptr);
+    return;
+  }
+
+  bool modified_prev = false;
+
+  if (buffer->undos.len > 0) {
+    BufferAction *prev = buffer->undos.items + buffer->undos.len - 1;
+    if (prev->kind == kind) {
+      switch (kind) {
+      case BufferActionKindInsert: {
+        if (cursor_row == prev->cursor_row &&
+            cursor_col == prev->cursor_col + prev->data.len) {
+          WideStr new_data;
+          new_data.len = prev->data.len + data.len;
+          new_data.ptr = malloc(new_data.len * sizeof(*new_data.ptr));
+          memcpy(new_data.ptr, prev->data.ptr, prev->data.len * sizeof(*new_data.ptr));
+          memcpy(new_data.ptr + prev->data.len, data.ptr, data.len * sizeof(*new_data.ptr));
+
+          free(prev->data.ptr);
+          free(data.ptr);
+
+          prev->data = new_data;
+
+          modified_prev = true;
+        }
+      } break;
+
+      case BufferActionKindInsertLine: break;
+
+      case BufferActionKindRemoveBeforeCursor: {
+        if (cursor_row == prev->cursor_row &&
+            cursor_col + prev->data.len == prev->cursor_col) {
+          WideStr new_data;
+          new_data.len = data.len + prev->data.len;
+          new_data.ptr = malloc(new_data.len * sizeof(*new_data.ptr));
+          memcpy(new_data.ptr, data.ptr, data.len * sizeof(*new_data.ptr));
+          memcpy(new_data.ptr + data.len, prev->data.ptr, prev->data.len * sizeof(*new_data.ptr));
+
+          free(prev->data.ptr);
+          free(data.ptr);
+
+          prev->data = new_data;
+
+          modified_prev = true;
+        }
+      } break;
+
+      case BufferActionKindRemoveAtCursor: {
+        if (cursor_row == prev->cursor_row &&
+            cursor_col == prev->cursor_col) {
+          WideStr new_data;
+          new_data.len = prev->data.len + data.len;
+          new_data.ptr = malloc(new_data.len * sizeof(*new_data.ptr));
+          memcpy(new_data.ptr, prev->data.ptr, prev->data.len * sizeof(*new_data.ptr));
+          memcpy(new_data.ptr + prev->data.len, data.ptr, data.len * sizeof(*new_data.ptr));
+
+          free(prev->data.ptr);
+          free(data.ptr);
+
+          prev->data = new_data;
+
+          modified_prev = true;
+        }
+      } break;
+      }
+    }
+  }
+
+  if (!modified_prev)
+    DA_APPEND(buffer->undos, ((BufferAction) { kind, data, cursor_row, cursor_col }));
+
+  for (u32 i = 0; i < buffer->redos.len; ++i)
+    if (buffer->redos.items[i].kind == BufferActionKindInsert ||
+        buffer->redos.items[i].kind == BufferActionKindRemoveBeforeCursor ||
+        buffer->redos.items[i].kind == BufferActionKindRemoveAtCursor)
+      free(buffer->redos.items[i].data.ptr);
+
+  buffer->redos.len = 0;
+}
+
 static void buffer_remove_selection(Buffer *buffer) {
   u32 min_row, min_col, max_row, max_col;
   get_buffer_selection_bounds(buffer,
@@ -68,25 +156,62 @@ static void buffer_remove_selection(Buffer *buffer) {
 
   if (min_row == max_row) {
     Line *line = buffer->lines.items + min_row;
+
+    WideStr undo_data;
+    undo_data.len = max_col - min_col;
+    undo_data.ptr = malloc(undo_data.len * sizeof(*undo_data.ptr));
+    memcpy(undo_data.ptr,
+           line->items + min_col,
+           undo_data.len * sizeof(*undo_data.ptr));
+    BufferActionKind undo_kind =
+      min_col == buffer->anchor_col ?
+      BufferActionKindRemoveBeforeCursor :
+      BufferActionKindRemoveAtCursor;
+    buffer_add_undo(buffer, undo_kind, undo_data,
+                    buffer->cursor_row, buffer->cursor_col);
+
     memmove(line->items + min_col,
             line->items + max_col,
             (line->len - max_col) * sizeof(*line->items));
     line->len -= max_col - min_col;
   } else {
+    WideStringBuilder undo_wsb = {0};
+
+    Line *line0 = buffer->lines.items + min_row;
+
+    WideStr line = { line0->items + min_col, line0->len - min_col };
+    wsb_push_wstr(&undo_wsb, line);
+
+    line0->len = min_col;
+
     for (u32 i = min_row + 1; i < max_row; ++i) {
+      WideStr line = buffer_get_line(buffer, min_row + 1);
+      wsb_push_wstr(&undo_wsb, line);
       if (buffer->lines.items[min_row + 1].items)
         free(buffer->lines.items[min_row + 1].items);
       DA_REMOVE_AT(buffer->lines, min_row + 1);
     }
 
-    Line *line0 = buffer->lines.items + min_row;
     Line *line1 = buffer->lines.items + min_row + 1;
-    line0->len = min_col;
+
+    line.len = max_col;
+    line.ptr = line1->items;
+    wsb_push_wstr(&undo_wsb, line);
+
     memmove(line1->items,
             line1->items + max_col,
             (line1->len - max_col) * sizeof(*line1->items));
     line1->len -= max_col;
     merge_line_down(buffer, min_row);
+
+    WideStr undo_data = { undo_wsb.items, undo_wsb.len };
+    BufferActionKind undo_kind =
+      (min_col == buffer->anchor_col &&
+       min_row == buffer->anchor_row) ?
+      BufferActionKindRemoveBeforeCursor :
+      BufferActionKindRemoveAtCursor;
+    buffer_add_undo(buffer, undo_kind, undo_data,
+                    buffer->cursor_row, buffer->cursor_col);
   }
   buffer->cursor_row = min_row;
   buffer->cursor_col = min_col;
@@ -97,6 +222,13 @@ static void buffer_remove_selection(Buffer *buffer) {
 void buffer_insert(Buffer *buffer, u32 _char) {
   if (buffer->is_selecting)
     buffer_remove_selection(buffer);
+
+  WideStr undo_data;
+  undo_data.len = 1;
+  undo_data.ptr = malloc(undo_data.len * sizeof(*undo_data.ptr));
+  undo_data.ptr[0] = _char;
+  buffer_add_undo(buffer, BufferActionKindInsert, undo_data,
+                  buffer->cursor_row, buffer->cursor_col);
 
   Line *line = buffer->lines.items + buffer->cursor_row;
   DA_INSERT(*line, buffer->cursor_col, _char);
@@ -111,6 +243,10 @@ void buffer_insert(Buffer *buffer, u32 _char) {
 void buffer_insert_new_line(Buffer *buffer) {
   if (buffer->is_selecting)
     buffer_remove_selection(buffer);
+
+  WideStr undo_data = {0};
+  buffer_add_undo(buffer, BufferActionKindInsertLine, undo_data,
+                  buffer->cursor_row, buffer->cursor_col);
 
   Line *line = buffer->lines.items + buffer->cursor_row;
   Line new_line = {0};
@@ -142,12 +278,27 @@ void buffer_remove_before_cursor(Buffer *buffer) {
 
   if (buffer->cursor_col > 0) {
     Line *line = buffer->lines.items + buffer->cursor_row;
+
+    WideStr undo_data;
+    undo_data.len = 1;
+    undo_data.ptr = malloc(undo_data.len * sizeof(*undo_data.ptr));
+    undo_data.ptr[0] = line->items[buffer->cursor_col - 1];
+    buffer_add_undo(buffer, BufferActionKindRemoveBeforeCursor, undo_data,
+                    buffer->cursor_row, buffer->cursor_col);
+
     --buffer->cursor_col;
     buffer->desired_col = buffer->cursor_col;
     DA_REMOVE_AT(*line, buffer->cursor_col);
 
     buffer->is_dirty = true;
   } else if (buffer->cursor_row > 0) {
+    WideStr undo_data;
+    undo_data.len = 1;
+    undo_data.ptr = malloc(undo_data.len * sizeof(*undo_data.ptr));
+    undo_data.ptr[0] = U'\n';
+    buffer_add_undo(buffer, BufferActionKindRemoveBeforeCursor, undo_data,
+                    buffer->cursor_row, buffer->cursor_col);
+
     --buffer->cursor_row;
     Line *line = buffer->lines.items + buffer->cursor_row;
     buffer->cursor_col = line->len;
@@ -166,10 +317,24 @@ void buffer_remove_at_cursor(Buffer *buffer) {
 
   Line *line = buffer->lines.items + buffer->cursor_row;
   if (buffer->cursor_col < line->len) {
+    WideStr undo_data;
+    undo_data.len = 1;
+    undo_data.ptr = malloc(undo_data.len * sizeof(*undo_data.ptr));
+    undo_data.ptr[0] = line->items[buffer->cursor_col];
+    buffer_add_undo(buffer, BufferActionKindRemoveAtCursor, undo_data,
+                    buffer->cursor_row, buffer->cursor_col);
+
     DA_REMOVE_AT(*line, buffer->cursor_col);
 
     buffer->is_dirty = true;
   } else if (buffer->cursor_row + 1 < buffer->lines.len) {
+    WideStr undo_data;
+    undo_data.len = 1;
+    undo_data.ptr = malloc(undo_data.len * sizeof(*undo_data.ptr));
+    undo_data.ptr[0] = U'\n';
+    buffer_add_undo(buffer, BufferActionKindRemoveAtCursor, undo_data,
+                    buffer->cursor_row, buffer->cursor_col);
+
     merge_line_down(buffer, buffer->cursor_row);
 
     buffer->is_dirty = true;
@@ -296,6 +461,9 @@ void buffer_remove_word_before_cursor(Buffer *buffer) {
     return;
   }
 
+  WideStringBuilder undo_wsb = {0};
+  u32 prev_cursor_col = buffer->cursor_col;
+
   bool found_word = false;
   Line *line = buffer->lines.items + buffer->cursor_row;
   while (buffer->cursor_col > 0 &&
@@ -305,10 +473,15 @@ void buffer_remove_word_before_cursor(Buffer *buffer) {
       found_word = true;
     --buffer->cursor_col;
     buffer->desired_col = buffer->cursor_col;
+    DA_INSERT(undo_wsb, 0, line->items[buffer->cursor_col]);
     DA_REMOVE_AT(*line, buffer->cursor_col);
 
     buffer->is_dirty = true;
   }
+
+  WideStr undo_data = { undo_wsb.items, undo_wsb.len };
+  buffer_add_undo(buffer, BufferActionKindRemoveBeforeCursor, undo_data,
+                  buffer->cursor_row, prev_cursor_col);
 }
 
 void buffer_remove_word_at_cursor(Buffer *buffer) {
@@ -324,16 +497,23 @@ void buffer_remove_word_at_cursor(Buffer *buffer) {
     return;
   }
 
+  WideStringBuilder undo_wsb = {0};
+
   bool found_word = false;
   while (buffer->cursor_col < line->len &&
          (!found_word ||
           iswalnum(line->items[buffer->cursor_col]))) {
     if (iswalnum(line->items[buffer->cursor_col]))
       found_word = true;
+    DA_APPEND(undo_wsb, line->items[buffer->cursor_col]);
     DA_REMOVE_AT(*line, buffer->cursor_col);
 
     buffer->is_dirty = true;
   }
+
+  WideStr undo_data = { undo_wsb.items, undo_wsb.len };
+  buffer_add_undo(buffer, BufferActionKindRemoveAtCursor, undo_data,
+                  buffer->cursor_row, buffer->cursor_col);
 }
 
 void buffer_move_left_word(Buffer *buffer, bool is_selecting) {
@@ -480,13 +660,116 @@ void buffer_goto_buffer_end(Buffer *buffer, bool is_selecting) {
   buffer->desired_col = buffer->cursor_col;
 }
 
-void buffer_clear_line(Buffer *buffer) {
-  Line *line = buffer->lines.items + buffer->cursor_row;
-  line->len = 0;
-  buffer->cursor_col = 0;
-  buffer->desired_col = buffer->cursor_col;
+void buffer_undo(Buffer *buffer) {
+  if (buffer->undos.len == 0)
+    return;
+
   buffer->is_selecting = false;
   buffer->is_dirty = true;
+  buffer->is_recording_undos = false;
+
+  BufferAction action = buffer->undos.items[--buffer->undos.len];
+  switch (action.kind) {
+  case BufferActionKindInsert: {
+    buffer->cursor_row = action.cursor_row;
+    buffer->cursor_col = action.cursor_col;
+
+    for (u32 i = 0; i < action.data.len; ++i)
+      buffer_remove_at_cursor(buffer);
+  } break;
+
+  case BufferActionKindInsertLine: {
+    buffer->cursor_row = action.cursor_row;
+    buffer->cursor_col = action.cursor_col;
+
+    buffer_remove_at_cursor(buffer);
+  } break;
+
+  case BufferActionKindRemoveBeforeCursor: {
+    buffer->cursor_row = action.cursor_row;
+    buffer->cursor_col = action.cursor_col;
+
+    for (u32 i = action.data.len; i > 0; --i)
+      buffer_move_left(buffer, false);
+
+    for (u32 i = 0; i < action.data.len; ++i) {
+      if (action.data.ptr[i] == U'\n')
+        buffer_insert_new_line(buffer);
+      else
+        buffer_insert(buffer, action.data.ptr[i]);
+    }
+  } break;
+
+  case BufferActionKindRemoveAtCursor: {
+    buffer->cursor_row = action.cursor_row;
+    buffer->cursor_col = action.cursor_col;
+
+    for (u32 i = 0; i < action.data.len; ++i) {
+      if (action.data.ptr[i] == U'\n')
+        buffer_insert_new_line(buffer);
+      else
+        buffer_insert(buffer, action.data.ptr[i]);
+    }
+
+    buffer->cursor_row = action.cursor_row;
+    buffer->cursor_col = action.cursor_col;
+  } break;
+  }
+
+  buffer->is_recording_undos = true;
+
+  DA_APPEND(buffer->redos, action);
+}
+
+void buffer_redo(Buffer *buffer) {
+  if (buffer->redos.len == 0)
+    return;
+
+  buffer->is_selecting = false;
+  buffer->is_dirty = true;
+  buffer->is_recording_undos = false;
+
+  BufferAction action = buffer->redos.items[--buffer->redos.len];
+  switch (action.kind) {
+  case BufferActionKindInsert: {
+    buffer->cursor_row = action.cursor_row;
+    buffer->cursor_col = action.cursor_col;
+
+    for (u32 i = 0; i < action.data.len; ++i) {
+      if (action.data.ptr[i] == U'\n')
+        buffer_insert_new_line(buffer);
+      else
+        buffer_insert(buffer, action.data.ptr[i]);
+    }
+  } break;
+
+  case BufferActionKindInsertLine: {
+    buffer->cursor_row = action.cursor_row;
+    buffer->cursor_col = action.cursor_col;
+
+    buffer_insert_new_line(buffer);
+  } break;
+
+  case BufferActionKindRemoveBeforeCursor: {
+    buffer->cursor_row = action.cursor_row;
+    buffer->cursor_col = action.cursor_col;
+
+    for (u32 i = 0; i < action.data.len; ++i)
+      buffer_remove_before_cursor(buffer);
+  } break;
+
+  case BufferActionKindRemoveAtCursor: {
+    buffer->cursor_row = action.cursor_row;
+    buffer->cursor_col = action.cursor_col;
+
+    for (u32 i = 0; i < action.data.len; ++i)
+      buffer_remove_at_cursor(buffer);
+  } break;
+  }
+
+  buffer->is_recording_undos = true;
+
+  DA_APPEND(buffer->undos, action);
 }
 
 void buffer_delete(Buffer *buffer) {
@@ -497,12 +780,30 @@ void buffer_delete(Buffer *buffer) {
   }
   if (buffer->lines.items)
     free(buffer->lines.items);
+
+  for (u32 i = 0; i < buffer->undos.len; ++i)
+    if (buffer->undos.items[i].kind == BufferActionKindInsert ||
+        buffer->undos.items[i].kind == BufferActionKindRemoveBeforeCursor ||
+        buffer->undos.items[i].kind == BufferActionKindRemoveAtCursor)
+      free(buffer->undos.items[i].data.ptr);
+  if (buffer->undos.items)
+    free(buffer->undos.items);
+
+  for (u32 i = 0; i < buffer->redos.len; ++i)
+    if (buffer->redos.items[i].kind == BufferActionKindInsert ||
+        buffer->redos.items[i].kind == BufferActionKindRemoveBeforeCursor ||
+        buffer->redos.items[i].kind == BufferActionKindRemoveAtCursor)
+      free(buffer->redos.items[i].data.ptr);
+  if (buffer->redos.items)
+    free(buffer->redos.items);
 }
 
 void buffer_read_file(Buffer *buffer, char *path) {
   FILE *file = fopen(path, "r");
   if (!file)
     return;
+
+  buffer->is_recording_undos = false;
 
   u32 wide_char;
   while ((wide_char = get_wide_char(file)) != (u32) -1) {
@@ -519,6 +820,7 @@ void buffer_read_file(Buffer *buffer, char *path) {
   buffer->desired_col = buffer->cursor_col;
   buffer->is_selecting = false;
   buffer->is_dirty = false;
+  buffer->is_recording_undos = true;
 }
 
 void buffer_write_file(Buffer *buffer, char *path) {
@@ -529,7 +831,7 @@ void buffer_write_file(Buffer *buffer, char *path) {
   for (u32 i = 0; i < buffer->lines.len; ++i) {
     Line *line = buffer->lines.items + i;
     if (i > 0)
-      put_wide_char('\n', file);
+      put_wide_char(U'\n', file);
     for (u32 j = 0; j < line->len; ++j)
       put_wide_char(line->items[j], file);
   }

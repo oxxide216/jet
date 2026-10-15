@@ -152,7 +152,7 @@ void editor_update_inline_errors_before_action(Editor *editor, Action action) {
   u32 rows = buffer_get_rows(&main_buffer->buffer);
 
   switch (action) {
-  case ActionAddLine: {
+  case ActionInsertLine: {
     for (u32 i = 0; i < ARRAY_LEN(ptrs); ++i) {
       if (ptrs[i]->len < rows + 1)
         DA_APPEND(*ptrs[i], NULL);
@@ -175,7 +175,7 @@ void editor_update_inline_errors_before_action(Editor *editor, Action action) {
     }
   } break;
 
-  case ActionRemoveLineAfterCursor: {
+  case ActionRemoveLineAtCursor: {
     if (main_buffer->buffer.cursor_row + 1 < rows) {
       for (u32 i = 0; i < ARRAY_LEN(ptrs); ++i) {
         for (u32 j = main_buffer->buffer.cursor_row + 1; j < ptrs[i]->len; ++j) {
@@ -186,9 +186,9 @@ void editor_update_inline_errors_before_action(Editor *editor, Action action) {
     }
   } break;
 
-  case ActionAdd:                break;
+  case ActionInsert:             break;
   case ActionRemoveBeforeCursor: break;
-  case ActionRemoveAfterCursor:  break;
+  case ActionRemoveAtCursor:     break;
   }
 }
 
@@ -299,7 +299,7 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
   u32 rows = buffer_get_rows(&main_buffer->buffer);
 
   switch (action) {
-  case ActionAddLine: {
+  case ActionInsertLine: {
     for (u32 i = editor->current_row_completions_begin; i < editor->completions.len; ++i) {
       Completion *completion = editor->completions.items + i;
       if (!str_eq(completion->abs_file_path, main_buffer->abs_file_path))
@@ -321,7 +321,7 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
     }
   } break;
 
-  case ActionRemoveLineAfterCursor: {
+  case ActionRemoveLineAtCursor: {
     if (main_buffer->buffer.cursor_row + 1 < rows) {
       for (u32 i = editor->current_row_completions_begin; i < editor->completions.len; ++i) {
         Completion *completion = editor->completions.items + i;
@@ -333,7 +333,7 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
     }
   } break;
 
-  case ActionAdd: {
+  case ActionInsert: {
     if (!is_part_of_word(param))
       break;
 
@@ -445,7 +445,7 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
     }
   } break;
 
-  case ActionRemoveAfterCursor: {
+  case ActionRemoveAtCursor: {
       for (u32 i = editor->current_row_completions_begin; i < editor->completions.len; ++i) {
         Completion *completion = editor->completions.items + i;
         if (!str_eq(completion->abs_file_path, main_buffer->abs_file_path) ||
@@ -491,4 +491,112 @@ void editor_remove_invalidated_completions(Editor *editor, Str invalidated_abs_f
 
 u32 editor_get_bucket_index(Editor *editor, WideStr str) {
   return str.ptr[str.len - 1] % ARRAY_LEN(editor->actual_completions);
+}
+
+void editor_update_before_buffer_action(Editor *editor,
+                                        BufferAction *action,
+                                        bool is_redo) {
+  MainBuffer *main_buffer =
+    editor->main_buffers.items + editor->current_main_buffer_index;
+  Buffer *buffer = editor_current_buffer(editor);
+  u32 prev_cursor_row = buffer->cursor_row;
+  u32 prev_cursor_col = buffer->cursor_col;
+
+  buffer->cursor_row = action->cursor_row;
+  buffer->cursor_col = action->cursor_col;
+
+  if (is_redo) {
+    switch (action->kind) {
+    case BufferActionKindInsert: {
+      if (editor->mode == JetModeEditor)
+        highlighter_update_before_action(main_buffer, ActionInsert);
+    } break;
+
+    case BufferActionKindInsertLine: {
+      editor_update_inline_errors_before_action(editor, ActionInsertLine);
+      editor_update_completions_before_action(editor, ActionInsertLine, 0);
+      if (editor->mode == JetModeEditor)
+        highlighter_update_before_action(main_buffer, ActionInsertLine);
+    } break;
+
+    case BufferActionKindRemoveBeforeCursor: {
+      for (u32 i = 0; i < action->data.len; ++i) {
+        if (action->data.ptr[i] == U'\n') {
+          editor_update_inline_errors_before_action(editor, ActionRemoveLineBeforeCursor);
+          editor_update_completions_before_action(editor, ActionRemoveLineBeforeCursor, 0);
+          if (editor->mode == JetModeEditor)
+            highlighter_update_before_action(main_buffer, ActionRemoveLineBeforeCursor);
+          --buffer->cursor_row;
+          buffer->cursor_col = buffer_get_current_line(buffer).len;
+        } else {
+          editor_update_inline_errors_before_action(editor, ActionRemoveBeforeCursor);
+          editor_update_completions_before_action(editor, ActionRemoveBeforeCursor, 1);
+          if (editor->mode == JetModeEditor)
+            highlighter_update_before_action(main_buffer, ActionRemoveBeforeCursor);
+          --buffer->cursor_col;
+        }
+      }
+    } break;
+
+    case BufferActionKindRemoveAtCursor: {
+      for (u32 i = 0; i < action->data.len; ++i) {
+        if (action->data.ptr[i] == U'\n') {
+          editor_update_inline_errors_before_action(editor, ActionRemoveLineAtCursor);
+          editor_update_completions_before_action(editor, ActionRemoveLineAtCursor, 0);
+          if (editor->mode == JetModeEditor)
+            highlighter_update_before_action(main_buffer, ActionRemoveLineAtCursor);
+        } else {
+          editor_update_inline_errors_before_action(editor, ActionRemoveAtCursor);
+          editor_update_completions_before_action(editor, ActionRemoveAtCursor, 1);
+          if (editor->mode == JetModeEditor)
+            highlighter_update_before_action(main_buffer, ActionRemoveAtCursor);
+        }
+      }
+    } break;
+    }
+  } else {
+    switch (action->kind) {
+    case BufferActionKindInsert: {
+      for (u32 i = 0; i < action->data.len; ++i) {
+        editor_update_inline_errors_before_action(editor, ActionRemoveAtCursor);
+        editor_update_completions_before_action(editor, ActionRemoveAtCursor, action->data.ptr[i]);
+        if (editor->mode == JetModeEditor)
+          highlighter_update_before_action(main_buffer, ActionRemoveAtCursor);
+      }
+    } break;
+
+    case BufferActionKindInsertLine: {
+      editor_update_inline_errors_before_action(editor, ActionRemoveLineAtCursor);
+      editor_update_completions_before_action(editor, ActionRemoveLineAtCursor, 0);
+      if (editor->mode == JetModeEditor)
+        highlighter_update_before_action(main_buffer, ActionRemoveLineAtCursor);
+    } break;
+
+    case BufferActionKindRemoveBeforeCursor: {
+      for (u32 i = 0; i < action->data.len; ++i) {
+        if (action->data.ptr[i] == U'\n') {
+          editor_update_inline_errors_before_action(editor, ActionInsertLine);
+          editor_update_completions_before_action(editor, ActionInsertLine, 0);
+          if (editor->mode == JetModeEditor)
+            highlighter_update_before_action(main_buffer, ActionInsertLine);
+          ++buffer->cursor_row;
+        }
+      }
+    } break;
+
+    case BufferActionKindRemoveAtCursor: {
+      for (u32 i = 0; i < action->data.len; ++i) {
+        if (action->data.ptr[i] == U'\n') {
+          editor_update_inline_errors_before_action(editor, ActionInsertLine);
+          editor_update_completions_before_action(editor, ActionInsertLine, 0);
+          if (editor->mode == JetModeEditor)
+            highlighter_update_before_action(main_buffer, ActionInsertLine);
+        }
+      }
+    } break;
+    }
+  }
+
+  buffer->cursor_row = prev_cursor_row;
+  buffer->cursor_col = prev_cursor_col;
 }

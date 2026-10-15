@@ -64,7 +64,7 @@ bool searcher_undo(Searcher *searcher, u32 *row, u32 *col, Buffer *search_buffer
 
   case SearchHistoryItemKindUpdatePattern: {
     searcher->pattern = item->prev_pattern;
-    buffer_clear_line(search_buffer);
+    buffer_reset(search_buffer);
     for (u32 i = 0; i < item->prev_pattern.len; ++i)
       buffer_insert(search_buffer, item->prev_pattern.ptr[i]);
   } break;

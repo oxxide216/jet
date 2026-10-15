@@ -291,9 +291,9 @@ i32 main(i32 argc, char **argv) {
                   buffer_insert(&CURRENT_BUFFER(), completion->wsb.items[i]);
                 editor.completing = false;
               } else {
-                editor_update_inline_errors_before_action(&editor, ActionAddLine);
-                editor_update_completions_before_action(&editor, ActionAddLine, 0);
-                highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionAddLine);
+                editor_update_inline_errors_before_action(&editor, ActionInsertLine);
+                editor_update_completions_before_action(&editor, ActionInsertLine, 0);
+                highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsertLine);
 
                 buffer_insert_new_line(&CURRENT_BUFFER());
 
@@ -304,7 +304,7 @@ i32 main(i32 argc, char **argv) {
                 if (editor.provider->execute(&editor, editor.options, editor.selected_option)) {
                   editor.mode = JetModeEditor;
                 } else {
-                  buffer_clear_line(&editor.palette_buffer);
+                  buffer_reset(&editor.palette_buffer);
                 }
               }
             } else if (editor.mode == JetModeSearch) {
@@ -338,7 +338,7 @@ i32 main(i32 argc, char **argv) {
               }
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
-                buffer_clear_line(editor_current_buffer(&editor));
+                buffer_reset(editor_current_buffer(&editor));
                 PaletteOption *option = editor.options.items + editor.selected_option;
                 for (u32 i = 0; i < option->name.len; ++i)
                   buffer_insert(editor_current_buffer(&editor), option->name.ptr[i]);
@@ -384,8 +384,8 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeDelete: {
           WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
           if (CURRENT_BUFFER().cursor_col == line.len) {
-            editor_update_inline_errors_before_action(&editor, ActionRemoveLineAfterCursor);
-            highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineAfterCursor);
+            editor_update_inline_errors_before_action(&editor, ActionRemoveLineAtCursor);
+            highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineAtCursor);
           } else {
             u32 amount;
             if (is_ctrl_pressed)
@@ -394,8 +394,8 @@ i32 main(i32 argc, char **argv) {
             else
               amount = 1;
 
-            editor_update_inline_errors_before_action(&editor, ActionRemoveAfterCursor);
-            editor_update_completions_before_action(&editor, ActionRemoveAfterCursor, amount);
+            editor_update_inline_errors_before_action(&editor, ActionRemoveAtCursor);
+            editor_update_completions_before_action(&editor, ActionRemoveAtCursor, amount);
           }
 
           if (is_ctrl_pressed)
@@ -543,7 +543,7 @@ i32 main(i32 argc, char **argv) {
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
               editor.completing = false;
-              buffer_clear_line(editor_current_buffer(&editor));
+              buffer_reset(editor_current_buffer(&editor));
             } else if (editor.mode == JetModeCommandPalette) {
               editor.mode = JetModeEditor;
             }
@@ -571,7 +571,7 @@ i32 main(i32 argc, char **argv) {
               editor.selected_option = editor.entry_cursor;
               editor.mode = JetModeCommandPalette;
               editor.completing = false;
-              buffer_clear_line(editor_current_buffer(&editor));
+              buffer_reset(editor_current_buffer(&editor));
             } else if (editor.mode == JetModeCommandPalette) {
               editor.mode = JetModeEditor;
             }
@@ -584,7 +584,7 @@ i32 main(i32 argc, char **argv) {
             editor.selected_option = 0;
             editor.mode = JetModeCommandPalette;
             editor.completing = false;
-            buffer_clear_line(editor_current_buffer(&editor));
+            buffer_reset(editor_current_buffer(&editor));
           }
         } break;
 
@@ -595,7 +595,7 @@ i32 main(i32 argc, char **argv) {
               editor.selected_option = 0;
               editor.mode = JetModeCommandPalette;
               editor.completing = false;
-              buffer_clear_line(editor_current_buffer(&editor));
+              buffer_reset(editor_current_buffer(&editor));
             } else {
               Str abs_file_path = CURRENT_ABS_FILE_PATH();
               char *abs_file_path_cstr = malloc(abs_file_path.len + 1);
@@ -666,12 +666,50 @@ i32 main(i32 argc, char **argv) {
               if (editor.mode == JetModeEditor) {
                 editor.mode = JetModeSearch;
                 searcher_init(&editor.searcher, &CURRENT_BUFFER());
-                buffer_clear_line(&editor.search_buffer);
+                buffer_reset(&editor.search_buffer);
               } else if (editor.mode == JetModeSearch) {
                 searcher_next_match(&editor.searcher,
                                     &CURRENT_BUFFER().cursor_row,
                                     &CURRENT_BUFFER().cursor_col,
                                     true);
+              }
+            }
+          }
+        } break;
+
+        case WinxKeyCodeZ: {
+          if (is_ctrl_pressed) {
+            if (is_shift_pressed) {
+              Buffer *buffer = editor_current_buffer(&editor);
+
+              if (buffer->redos.len > 0) {
+                BufferAction *action = buffer->redos.items + buffer->redos.len - 1;
+                editor_update_before_buffer_action(&editor, action, true);
+              }
+
+              buffer_redo(buffer);
+
+              if (editor.mode == JetModeEditor) {
+                if (CURRENT_BUFFER().cursor_row > 0)
+                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row - 1);
+                else
+                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
+              }
+            } else {
+              Buffer *buffer = editor_current_buffer(&editor);
+
+              if (buffer->undos.len > 0) {
+                BufferAction *action = buffer->undos.items + buffer->undos.len - 1;
+                editor_update_before_buffer_action(&editor, action, false);
+              }
+
+              buffer_undo(buffer);
+
+              if (editor.mode == JetModeEditor) {
+                if (CURRENT_BUFFER().cursor_row > 0)
+                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row - 1);
+                else
+                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
               }
             }
           }
@@ -719,8 +757,8 @@ i32 main(i32 argc, char **argv) {
       case WinxEventKindChar: {
         if (!is_ctrl_pressed && !is_alt_pressed) {
           if (editor.mode == JetModeEditor) {
-            editor_update_inline_errors_before_action(&editor, ActionAdd);
-            editor_update_completions_before_action(&editor, ActionAdd,
+            editor_update_inline_errors_before_action(&editor, ActionInsert);
+            editor_update_completions_before_action(&editor, ActionInsert,
                                                     event.as._char._char);
           }
 

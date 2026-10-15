@@ -20,12 +20,12 @@ typedef Da(u32) WideStringBuilder;
 typedef Da(u32) Indices;
 
 typedef enum {
-  ActionAddLine = 0,
+  ActionInsertLine = 0,
   ActionRemoveLineBeforeCursor,
-  ActionRemoveLineAfterCursor,
-  ActionAdd,
+  ActionRemoveLineAtCursor,
+  ActionInsert,
   ActionRemoveBeforeCursor,
-  ActionRemoveAfterCursor,
+  ActionRemoveAtCursor,
 } Action;
 
 bool      str_ends_with(Str str, Str postfix);
@@ -37,6 +37,7 @@ u64       wide_str_hash(WideStr str);
 void      put_wide_char(u32 ch, FILE *stream);
 u32       get_wide_char(FILE *stream);
 WideStr   str_to_wide_str(Str str);
+void      wsb_push_wstr(WideStringBuilder *wsb, WideStr str);
 void      wsb_push_str(WideStringBuilder *wsb, Str str);
 void      wsb_push_u32(WideStringBuilder *wsb, u32 num);
 char     *wide_str_to_cstr(WideStr str);

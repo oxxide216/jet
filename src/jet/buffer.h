@@ -7,16 +7,34 @@
 typedef Da(u32) Line;
 typedef Da(Line) Lines;
 
-// TODO: maybe try linked list of arrays instead of an array of arrays?
+typedef enum {
+  BufferActionKindInsert = 0,
+  BufferActionKindInsertLine,
+  BufferActionKindRemoveBeforeCursor,
+  BufferActionKindRemoveAtCursor,
+} BufferActionKind;
+
 typedef struct {
-  Lines lines;
-  u32   anchor_row;
-  u32   anchor_col;
-  u32   cursor_row;
-  u32   cursor_col;
-  u32   desired_col;
-  bool  is_selecting;
-  bool  is_dirty;
+  BufferActionKind kind;
+  WideStr          data;
+  u32              cursor_row;
+  u32              cursor_col;
+} BufferAction;
+
+typedef Da(BufferAction) BufferActions;
+
+typedef struct {
+  Lines         lines;
+  BufferActions undos;
+  BufferActions redos;
+  u32           anchor_row;
+  u32           anchor_col;
+  u32           cursor_row;
+  u32           cursor_col;
+  u32           desired_col;
+  bool          is_selecting;
+  bool          is_dirty;
+  bool          is_recording_undos;
 } Buffer;
 
 Buffer buffer_make(void);
@@ -39,7 +57,8 @@ void   buffer_goto_line_begin(Buffer *buffer, bool is_selecting);
 void   buffer_goto_line_end(Buffer *buffer, bool is_selecting);
 void   buffer_goto_buffer_begin(Buffer *buffer, bool is_selecting);
 void   buffer_goto_buffer_end(Buffer *buffer, bool is_selecting);
-void   buffer_clear_line(Buffer *buffer);
+void   buffer_undo(Buffer *buffer);
+void   buffer_redo(Buffer *buffer);
 void   buffer_delete(Buffer *buffer);
 
 void buffer_read_file(Buffer *buffer, char *path);
