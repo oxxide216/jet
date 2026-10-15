@@ -421,8 +421,8 @@ void buffer_move_up_paragraph(Buffer *buffer, bool is_selecting) {
 
   while (buffer->cursor_row > 0 &&
          (!found_paragraph ||
-          buffer->lines.items[buffer->cursor_row - 1].len > 0)) {
-    if (buffer->lines.items[buffer->cursor_row - 1].len > 0)
+          buffer->lines.items[buffer->cursor_row].len > 0)) {
+    if (buffer->lines.items[buffer->cursor_row].len > 0)
       found_paragraph = true;
     --buffer->cursor_row;
   }
