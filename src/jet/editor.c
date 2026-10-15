@@ -108,7 +108,12 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
 
     editor->current_main_buffer_index = editor->main_buffers.len;
     MainBuffer main_buffer = main_buffer_make(new_rel_path);
-    main_buffer.abs_file_path = entry->file_path;
+    main_buffer.abs_file_path.len = entry->file_path.len;
+    main_buffer.abs_file_path.ptr =
+      malloc(main_buffer.abs_file_path.len * sizeof(*main_buffer.abs_file_path.ptr));
+    memcpy(main_buffer.abs_file_path.ptr,
+           entry->file_path.ptr,
+           main_buffer.abs_file_path.len * sizeof(*main_buffer.abs_file_path.ptr));
     buffer_read_file(&main_buffer.buffer, path);
     main_buffer_rebuild_entries(&main_buffer, editor);
     highlighter_do_main_buffer(&main_buffer);
