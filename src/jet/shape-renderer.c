@@ -21,7 +21,9 @@ ShapeRenderer sr_make(VikInstance *instance,
   sr.instance = instance;
   sr.executor = executor;
 
-  sr.ubo = vik_make_buffer(instance, sizeof(ShapeUBO), VikBufferKindUBO);
+  sr.ubo = vik_make_buffer(instance, sizeof(ShapeUBO),
+                           VikBufferKindUBO,
+                           VikBufferAccessCPU);
 
   VikShader *shape_shader = vik_make_shader_vf(instance, shape_vert_bc, shape_frag_bc);
   sr.shape_pipeline = vik_make_pipeline(instance, shape_shader,

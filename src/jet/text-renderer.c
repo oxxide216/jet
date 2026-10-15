@@ -70,10 +70,12 @@ TextRenderer tr_make(WinxWindow *window,
   tr.instance = instance;
   tr.executor = executor;
 
-  tr.ubo = vik_make_buffer(instance, sizeof(TextUBO), VikBufferKindUBO);
+  tr.ubo = vik_make_buffer(instance, sizeof(TextUBO),
+                           VikBufferKindUBO,
+                           VikBufferAccessCPU);
 
   VikShader *text_shader = vik_make_shader_vf(instance, text_vert_bc, text_frag_bc);
-  tr.text_ssbo = vik_make_buffer(instance, 1, VikBufferKindSSBO);
+  tr.text_ssbo = vik_make_buffer(instance, 1, VikBufferKindSSBO, VikBufferAccessCPU);
   VikBuffer *text_buffers[] = { tr.ubo, tr.text_ssbo, };
   tr.text_pipeline = vik_make_pipeline(instance, text_shader,
                                        attrs, ARRAY_LEN(attrs),
@@ -82,7 +84,7 @@ TextRenderer tr_make(WinxWindow *window,
   vik_delete_shader(text_shader);
 
   VikShader *sel_shader = vik_make_shader_vf(instance, sel_vert_bc, sel_frag_bc);
-  tr.sel_ssbo = vik_make_buffer(instance, 1, VikBufferKindSSBO);
+  tr.sel_ssbo = vik_make_buffer(instance, 1, VikBufferKindSSBO, VikBufferAccessCPU);
   VikBuffer *sel_buffers[] = { tr.ubo, tr.sel_ssbo, };
   tr.sel_pipeline = vik_make_pipeline(instance, sel_shader,
                                       attrs, ARRAY_LEN(attrs),
@@ -440,7 +442,8 @@ void tr_end_frame(TextRenderer *tr) {
     tr->text_ssbo = vik_make_buffer(tr->instance,
                                     tr->text_ssbo_data.len *
                                     sizeof(*tr->text_ssbo_data.items),
-                                    VikBufferKindSSBO);
+                                    VikBufferKindSSBO,
+                                    VikBufferAccessCPU);
     tr->max_text_ssbo_data_len = tr->text_ssbo_data.len;
   }
 
@@ -453,7 +456,8 @@ void tr_end_frame(TextRenderer *tr) {
     tr->sel_ssbo = vik_make_buffer(tr->instance,
                                    tr->sel_ssbo_data.len *
                                    sizeof(*tr->sel_ssbo_data.items),
-                                   VikBufferKindSSBO);
+                                   VikBufferKindSSBO,
+                                   VikBufferAccessCPU);
     tr->max_sel_ssbo_data_len = tr->sel_ssbo_data.len;
   }
 
