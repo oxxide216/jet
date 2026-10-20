@@ -219,6 +219,9 @@ void highlighter_redo_line(MainBuffer *buffer, u32 row) {
       }
     }
 
+    if (state.kind == HighlighterStateKindSLComment)
+      state.kind = HighlighterStateKindBasic;
+
     ++row;
 
     iterate =
