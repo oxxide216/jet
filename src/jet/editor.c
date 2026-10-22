@@ -290,7 +290,8 @@ void editor_update_current_row_completions_begin(Editor *editor) {
                     main_buffer->abs_file_path)))
       --editor->current_row_completions_begin;
 
-    if (editor->completions.items[editor->current_row_completions_begin].row <
+    if (editor->current_row_completions_begin < editor->completions.len &&
+        editor->completions.items[editor->current_row_completions_begin].row <
         main_buffer->buffer.cursor_row)
       ++editor->current_row_completions_begin;
 
@@ -560,7 +561,7 @@ void editor_update_before_buffer_action(Editor *editor,
     case BufferActionKindInsert: {
       for (u32 i = 0; i < action->data.len; ++i) {
         editor_update_inline_errors_before_action(editor, ActionRemoveAtCursor);
-        editor_update_completions_before_action(editor, ActionRemoveAtCursor, action->data.ptr[i]);
+        editor_update_completions_before_action(editor, ActionRemoveAtCursor, 1);
         if (editor->mode == JetModeEditor)
           highlighter_update_before_action(main_buffer, ActionRemoveAtCursor);
       }
