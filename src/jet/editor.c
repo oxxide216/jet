@@ -494,10 +494,6 @@ void editor_remove_invalidated_completions(Editor *editor, Str invalidated_abs_f
   }
 }
 
-u32 editor_get_bucket_index(Editor *editor, WideStr str) {
-  return str.ptr[str.len - 1] % ARRAY_LEN(editor->actual_completions);
-}
-
 void editor_update_before_buffer_action(Editor *editor,
                                         BufferAction *action,
                                         bool is_redo) {

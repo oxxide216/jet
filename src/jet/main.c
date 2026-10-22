@@ -276,12 +276,11 @@ i32 main(i32 argc, char **argv) {
           if (!is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
               if (editor.completing &&
-                  editor.completions_scroll < editor.actual_completions_len) {
+                  editor.completions_scroll < editor.actual_completions.len) {
                 WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
                 WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
-                u32 index = editor_get_bucket_index(&editor, word);
                 Completion *completion =
-                  editor.actual_completions[index].items + editor.completions_scroll;
+                  editor.actual_completions.items + editor.completions_scroll;
                 while (CURRENT_BUFFER().cursor_col < line.len &&
                        is_part_of_word(line.ptr[CURRENT_BUFFER().cursor_col]))
                   ++CURRENT_BUFFER().cursor_col;
@@ -318,16 +317,16 @@ i32 main(i32 argc, char **argv) {
           if (!is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
               if (editor.completing &&
-                  editor.completions_scroll < editor.actual_completions_len) {
+                  editor.completions_scroll < editor.actual_completions.len) {
                 if (is_shift_pressed) {
                   if (editor.completions_scroll > 0)
                     --editor.completions_scroll;
-                  else if (editor.actual_completions_len == 0)
+                  else if (editor.actual_completions.len == 0)
                     editor.completions_scroll = 0;
                   else
-                    editor.completions_scroll = editor.actual_completions_len - 1;
+                    editor.completions_scroll = editor.actual_completions.len - 1;
                 } else {
-                  if (editor.completions_scroll + 1 < editor.actual_completions_len)
+                  if (editor.completions_scroll + 1 < editor.actual_completions.len)
                     ++editor.completions_scroll;
                   else
                     editor.completions_scroll = 0;
@@ -464,8 +463,8 @@ i32 main(i32 argc, char **argv) {
               }
             } else {
               if (editor.completing &&
-                  editor.completions_scroll < editor.actual_completions_len) {
-                if (editor.completions_scroll + 1 < editor.actual_completions_len)
+                  editor.completions_scroll < editor.actual_completions.len) {
+                if (editor.completions_scroll + 1 < editor.actual_completions.len)
                   ++editor.completions_scroll;
                 else
                   editor.completions_scroll = 0;
@@ -503,13 +502,13 @@ i32 main(i32 argc, char **argv) {
               }
             } else {
               if (editor.completing &&
-                  editor.completions_scroll < editor.actual_completions_len) {
+                  editor.completions_scroll < editor.actual_completions.len) {
                 if (editor.completions_scroll > 0)
                   --editor.completions_scroll;
-                else if (editor.actual_completions_len == 0)
+                else if (editor.actual_completions.len == 0)
                   editor.completions_scroll = 0;
                 else
-                  editor.completions_scroll = editor.actual_completions_len - 1;
+                  editor.completions_scroll = editor.actual_completions.len - 1;
               } else {
                 WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
                 u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
@@ -803,31 +802,26 @@ i32 main(i32 argc, char **argv) {
       // Update actual completions
       WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
       if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
-        editor.actual_completions_len = 0;
-        for (u32 i = 0; i < ARRAY_LEN(editor.actual_completions); ++i)
-          editor.actual_completions[i].len = 0;
-        u32 index = editor_get_bucket_index(&editor, word);
+        editor.actual_completions.len = 0;
         for (u32 i = 0; i < editor.completions.len; ++i) {
           Completion *completion0 = editor.completions.items + i;
           WideStr completion0_wstr = { completion0->wsb.items, completion0->wsb.len };
           if (wide_str_begins_with(completion0_wstr, word) &&
               completion0_wstr.len > word.len) {
             bool already_exists = false;
-            for (u32 j = 0; j < editor.actual_completions[index].len; ++j) {
-              Completion *completion1 = editor.actual_completions[index].items + j;
+            for (u32 j = 0; j < editor.actual_completions.len; ++j) {
+              Completion *completion1 = editor.actual_completions.items + j;
               if (completion0->hash == completion1->hash) {
                 already_exists = true;
                 break;
               }
             }
-            if (!already_exists) {
-              DA_APPEND(editor.actual_completions[index], *completion0);
-              ++editor.actual_completions_len;
-            }
+            if (!already_exists)
+              DA_APPEND(editor.actual_completions, *completion0);
           }
         }
 
-        if (editor.completions_scroll >= editor.actual_completions_len)
+        if (editor.completions_scroll >= editor.actual_completions.len)
           editor.completions_scroll = 0;
       }
     }
@@ -945,7 +939,7 @@ i32 main(i32 argc, char **argv) {
     if (editor.completing) {
       WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
       if (word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
-        if (editor.actual_completions_len > 0) {
+        if (editor.actual_completions.len > 0) {
           // Rendering completion options
 
           f32 x = tr.sel_end_x;
@@ -989,36 +983,13 @@ i32 main(i32 argc, char **argv) {
           tr_set_bg_color(&ptr, FG_COLOR);
           tr_set_fg_color(&ptr, BG_COLOR);
 
-          Completions *bucket = editor.actual_completions;
-          u32 item_index = 0;
-
-          u32 i = 0;
-          while (i < editor.completions_scroll) {
-            if (editor.completions_scroll - i < bucket->len) {
-              item_index = editor.completions_scroll - i;
-              i += item_index;
-              break;
-            } else {
-              i += bucket->len;
-              ++bucket;
-              item_index = 0;
-            }
-          }
-
           for (u32 i = editor.completions_scroll;
-               i < editor.actual_completions_len &&
+               i < editor.actual_completions.len &&
                  y + (f32) editor.font_scale <= y_limit;
                ++i) {
-            while (item_index >= bucket->len) {
-              ++bucket;
-              item_index = 0;
-            }
-
-            Completion *completion = bucket->items + item_index;
+            Completion *completion = editor.completions.items + i;
             tr_draw_text(&ptr, completion->wsb.items, completion->wsb.len, x, y);
             y += (f32) editor.font_scale;
-
-            ++item_index;
 
             if (i == editor.completions_scroll) {
               tr_set_bg_color(&ptr, BG_COLOR);
@@ -1285,9 +1256,8 @@ i32 main(i32 argc, char **argv) {
     free(editor.completions.items[i].wsb.items);
   if (editor.completions.items)
     free(editor.completions.items);
-  for (u32 i = 0; i < ARRAY_LEN(editor.actual_completions); ++i)
-    if (editor.actual_completions[i].items)
-      free(editor.actual_completions[i].items);
+  if (editor.actual_completions.items)
+    free(editor.actual_completions.items);
   buffer_delete(&editor.palette_buffer);
   buffer_delete(&editor.search_buffer);
   for (u32 i = 0; i < editor.main_buffers.len; ++i) {
