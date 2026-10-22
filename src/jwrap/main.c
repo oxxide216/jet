@@ -232,7 +232,7 @@ i32 main(i32 argc, char **argv) {
     exit(1);
   }
 
-  CnsError cns_error = cns_unix_connect(cns, socket_path, &connect_info);
+  CnsError cns_error = cns_unix_connect(cns, socket_path, &connect_info, NULL);
   if (cns_error != CnsErrorOk) {
     ERROR("Failed to connect to Jet server: %s\n", cns_get_error_str(cns_error));
     exit(1);
