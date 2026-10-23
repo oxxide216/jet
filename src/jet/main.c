@@ -317,6 +317,8 @@ i32 main(i32 argc, char **argv) {
           if (!is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
               if (editor.completing &&
+                  buffer_get_word_at_cursor(&CURRENT_BUFFER()).len >+ MINIMAL_COMPLETION_PREFIX_LENGTH &&
+                  editor.actual_completions.len > 0 &&
                   editor.completions_scroll < editor.actual_completions.len) {
                 if (is_shift_pressed) {
                   if (editor.completions_scroll > 0)
@@ -463,6 +465,8 @@ i32 main(i32 argc, char **argv) {
               }
             } else {
               if (editor.completing &&
+                  buffer_get_word_at_cursor(&CURRENT_BUFFER()).len >+ MINIMAL_COMPLETION_PREFIX_LENGTH &&
+                  editor.actual_completions.len > 0 &&
                   editor.completions_scroll < editor.actual_completions.len) {
                 if (editor.completions_scroll + 1 < editor.actual_completions.len)
                   ++editor.completions_scroll;
@@ -502,6 +506,8 @@ i32 main(i32 argc, char **argv) {
               }
             } else {
               if (editor.completing &&
+                  buffer_get_word_at_cursor(&CURRENT_BUFFER()).len >+ MINIMAL_COMPLETION_PREFIX_LENGTH &&
+                  editor.actual_completions.len > 0 &&
                   editor.completions_scroll < editor.actual_completions.len) {
                 if (editor.completions_scroll > 0)
                   --editor.completions_scroll;
