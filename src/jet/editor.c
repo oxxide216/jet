@@ -347,7 +347,7 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
     bool line_empty = true;
     for (u32 i = editor->current_row_completions_begin; i < editor->completions.len; ++i) {
       Completion *completion = editor->completions.items + i;
-      if (completion->row > main_buffer->buffer.cursor_row ||
+      if (completion->row != main_buffer->buffer.cursor_row ||
           !str_eq(completion->abs_file_path, main_buffer->abs_file_path))
         break;
       line_empty = false;
