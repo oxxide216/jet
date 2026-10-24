@@ -10,6 +10,15 @@
 
 typedef Da(MessageEntry *) MessageEntryPtrs;
 
+typedef struct {
+  WideStringBuilder wsb;
+  u32               col;
+  u64               hash;
+} Completion;
+
+typedef Da(Completion) Completions;
+typedef Da(Completions) Completionss;
+
 struct MainBuffer {
   Buffer            buffer;
   u32               scroll;
@@ -18,6 +27,7 @@ struct MainBuffer {
   MessageEntryPtrs  errors;
   MessageEntryPtrs  warnings;
   MessageEntryPtrs  infos;
+  Completionss      completion_lines;
   Highlighter       highlighter;
 };
 
@@ -28,15 +38,6 @@ typedef enum {
   JetModeCommandPalette,
   JetModeSearch,
 } JetMode;
-
-typedef struct {
-  WideStringBuilder wsb;
-  u32               row, col;
-  Str               abs_file_path;
-  u64               hash;
-} Completion;
-
-typedef Da(Completion) Completions;
 
 struct Editor {
   MainBuffers main_buffers;
@@ -60,14 +61,9 @@ struct Editor {
   MessageEntries  infos;
   u32             entry_cursor;
 
-  bool        completing;
-  Completions completions;
-  Completions actual_completions;
-  u32         completions_scroll;
-  u32         current_row_completions_begin;
-  u32         prev_cursor_row;
-  u32         prev_current_main_buffer_index;
-  f32         last_deduplication_time;
+  bool         completing;
+  Completions  actual_completions;
+  u32          completions_scroll;
 
   Searcher searcher;
   f32      search_scroll_x;
@@ -82,12 +78,9 @@ MessageEntry *editor_get_entry(Editor *editor, u32 index);
 void          editor_go_to_entry(Editor *editor, MessageEntry *entry);
 void          editor_update_inline_errors_before_action(Editor *editor, Action action);
 void          editor_build_completions(Editor *editor, u32 main_buffer_index);
-void          editor_update_current_row_completions_begin(Editor *editor);
 void          editor_update_completions_before_action(Editor *editor,
                                                       Action action,
                                                       u32 param);
-void          editor_remove_invalidated_completions(Editor *editor,
-                                                    Str invalidated_abs_file_path);
 void          editor_update_before_buffer_action(Editor *editor,
                                                  BufferAction *action,
                                                  bool is_redo);
