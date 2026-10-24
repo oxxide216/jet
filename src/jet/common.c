@@ -69,7 +69,7 @@ u64 wide_str_hash(WideStr str) {
   return result;
 }
 
-void put_wide_char(u32 ch, FILE *stream) {
+void write_wide_char(u32 ch, FILE *stream) {
   u8 *ptr = (u8 *) &ch;
 
   for (u8 i = 0; i < 4; ++i)
@@ -77,7 +77,7 @@ void put_wide_char(u32 ch, FILE *stream) {
       putc(ptr[i], stream);
 }
 
-u32 get_wide_char(FILE *stream) {
+u32 read_wide_char(FILE *stream) {
   char ptr[4] = {0};
 
   ptr[0] = getc(stream);
@@ -94,14 +94,16 @@ u32 get_wide_char(FILE *stream) {
   return *(u32 *) ptr;
 }
 
-static u32 read_wide_char(Str *str) {
+u32 get_wide_char(Str *str) {
   u8 ptr[4] = {0};
 
   ptr[0] = str->ptr++[0];
+  --str->len;
   for (u32 i = 0; i < sizeof(offset_table); ++i) {
     if (str->len <= i + 1 || !((ptr[0] >> offset_table[i]) & 1))
       break;
     ptr[i + 1] = str->ptr++[0];
+    --str->len;
   }
 
   return *(u32 *) ptr;
@@ -114,7 +116,7 @@ WideStr str_to_wide_str(Str str) {
 
   u32 *wstr = malloc(wlen * sizeof(*wstr));
   for (u32 i = 0; i < wlen; ++i)
-    wstr[i] = read_wide_char(&str);
+    wstr[i] = get_wide_char(&str);
 
   return (WideStr) {
     .ptr = wstr,
@@ -133,7 +135,7 @@ void wsb_push_str(WideStringBuilder *wsb, Str str) {
     wlen += (str.ptr[i] >> 6) != 0b10;
 
   for (u32 i = 0; i < wlen; ++i) {
-    u32 wide_char = read_wide_char(&str);
+    u32 wide_char = get_wide_char(&str);
     DA_APPEND(*wsb, wide_char);
   }
 }

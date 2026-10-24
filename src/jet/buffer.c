@@ -806,7 +806,7 @@ void buffer_read_file(Buffer *buffer, char *path) {
   buffer->is_recording_undos = false;
 
   u32 wide_char;
-  while ((wide_char = get_wide_char(file)) != (u32) -1) {
+  while ((wide_char = read_wide_char(file)) != (u32) -1) {
     if (wide_char == U'\n')
       buffer_insert_new_line(buffer);
     else
@@ -831,9 +831,9 @@ void buffer_write_file(Buffer *buffer, char *path) {
   for (u32 i = 0; i < buffer->lines.len; ++i) {
     Line *line = buffer->lines.items + i;
     if (i > 0)
-      put_wide_char(U'\n', file);
+      write_wide_char(U'\n', file);
     for (u32 j = 0; j < line->len; ++j)
-      put_wide_char(line->items[j], file);
+      write_wide_char(line->items[j], file);
   }
 
   fclose(file);
@@ -949,4 +949,42 @@ u32 buffer_get_chars_amount_for_remove_word_at_cursor(Buffer *buffer) {
   }
 
   return result;
+}
+
+Str  buffer_get_selection_str(Buffer *buffer) {
+  if (!buffer->is_selecting)
+    return (Str) {0};
+
+  u32 min_row, min_col, max_row, max_col;
+  get_buffer_selection_bounds(buffer,
+                              &min_row, &min_col,
+                              &max_row, &max_col);
+
+  StringBuilder sb = {0};
+
+  for (u32 i = min_row; i <= max_row; ++i) {
+    Line *line = buffer->lines.items + i;
+    u32 min = i == min_row ? min_col : 0;
+    u32 max = i == max_row ? max_col : line->len;
+    for (u32 j = min; j < max; ++j)
+      for (u32 k = 0; k < 4; ++k)
+        if (((char *) (line->items + j))[k])
+          sb_push_char(&sb, ((char *) (line->items + j))[k]);
+  }
+
+  return sb_to_str(sb);
+}
+
+void buffer_set_selection_str(Buffer *buffer, Str str) {
+  if (buffer->is_selecting) {
+    buffer_remove_selection(buffer);
+  }
+
+  while (str.len > 0) {
+    u32 _char = get_wide_char(&str);
+    if (_char == U'\n')
+      buffer_insert_new_line(buffer);
+    else
+      buffer_insert(buffer, _char);
+  }
 }

@@ -728,6 +728,22 @@ i32 main(i32 argc, char **argv) {
           }
         } break;
 
+        case WinxKeyCodeC: {
+          if (is_ctrl_pressed) {
+            Buffer *buffer = editor_current_buffer(&editor);
+            Str selection = buffer_get_selection_str(buffer);
+            if (selection.len > 0) {
+              winx_set_clipboard_content(window, selection.ptr, selection.len);
+              free(selection.ptr);
+            }
+          }
+        } break;
+
+        case WinxKeyCodeV: {
+          if (is_ctrl_pressed)
+            winx_get_clipboard_content(window);
+        } break;
+
         case WinxKeyCodeEscape: {
           if (editor.mode == JetModeEditor) {
             editor.completing = false;
@@ -799,6 +815,16 @@ i32 main(i32 argc, char **argv) {
               ++CURRENT_BUFFER().cursor_col;
           }
         }
+      } break;
+
+      case WinxEventKindClipboardData: {
+        Buffer *buffer = editor_current_buffer(&editor);
+        Str new_selection = {
+          event.as.clipboard_data.data,
+          event.as.clipboard_data.len,
+        };
+        buffer_set_selection_str(buffer, new_selection);
+        free(new_selection.ptr);
       } break;
 
       default: break;
