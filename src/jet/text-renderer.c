@@ -123,13 +123,15 @@ void tr_begin_frame(TextRenderer *tr, u32 scale,
 }
 
 static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
-                          f32 *out_x, f32 *out_y,
+                          f32 *out_inner_x, f32 *out_x, f32 *out_y,
                           f32 *out_width, f32 *out_height,
                           f32 *out_tl_u, f32 *out_tl_v,
                           f32 *out_br_u, f32 *out_br_v) {
   for (u32 i = 0; i < atlas->glyphs_cache[scale - MIN_FONT_SCALE].len; ++i) {
     Glyph *glyph = atlas->glyphs_cache[scale - MIN_FONT_SCALE].items + i;
     if (glyph->_char == _char) {
+      if (out_inner_x)
+        *out_inner_x += glyph->x_inner_offset;
       if (out_x)
         *out_x += glyph->x_offset;
       if (out_y)
@@ -197,11 +199,13 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
   int y0;
   stbtt_GetCodepointBitmapBox(&atlas->font, _char, 0.0, scale_y, NULL, &y0, NULL, NULL);
 
+  f32 x_inner_offset = lsb * scale_y;
   f32 x_offset = advance * scale_y;
   f32 y_offset = ascent * scale_y + y0;
 
   Glyph glyph = {
     _char,
+    x_inner_offset,
     x_offset, y_offset,
     o_width, o_height,
     o_tl_u, o_tl_v,
@@ -210,6 +214,8 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
   DA_APPEND(atlas->glyphs_cache[scale - MIN_FONT_SCALE], glyph);
   atlas->is_glyphs_cache_dirty = true;
 
+  if (out_inner_x)
+    *out_inner_x += x_inner_offset;
   if (out_x)
     *out_x += x_offset;
   if (out_y)
@@ -251,7 +257,7 @@ f32 tr_measure_text(TextRenderer *tr, u32 *text, u32 text_len) {
 
   for (u32 i = 0; i < text_len; ++i)
     get_char_data(tr->atlas, text[i], tr->scale,
-                  &width, NULL, NULL, NULL,
+                  NULL, &width, NULL, NULL, NULL,
                   NULL, NULL, NULL, NULL);
 
   return width;
@@ -324,7 +330,7 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len,
       {},
     };
     get_char_data(tr->atlas, text[i], tr->scale,
-                  &x, &text_entry.y,
+                  &text_entry.x, &x, &text_entry.y,
                   &text_entry.w, &text_entry.h,
                   &text_entry.tl_u, &text_entry.tl_v,
                   &text_entry.br_u, &text_entry.br_v);
@@ -420,7 +426,7 @@ void tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
       {},
     };
     get_char_data(tr->atlas, text[i], tr->scale,
-                  &x, &text_entry.y,
+                  &text_entry.x, &x, &text_entry.y,
                   &text_entry.w, &text_entry.h,
                   &text_entry.tl_u, &text_entry.tl_v,
                   &text_entry.br_u, &text_entry.br_v);

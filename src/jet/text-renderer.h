@@ -9,6 +9,7 @@
 
 typedef struct {
   u32 _char;
+  f32 x_inner_offset;
   f32 x_offset;
   f32 y_offset;
   f32 w, h;
