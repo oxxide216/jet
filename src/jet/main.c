@@ -146,7 +146,7 @@ i32 main(i32 argc, char **argv) {
   VikInstance *instance = vik_make_instance(window, VikRequestFlagsNone, false);
   VikExecutor *executor = vik_make_executor(instance);
 
-  Atlas atlas = atlas_make(instance, fonts_NordwandMono_Regular_ttf);
+  Atlas atlas = atlas_make(instance, fonts_JetBrainsMono_Medium_ttf);
 
   TextRenderer tr = tr_make(window, instance, executor,
                             &atlas,

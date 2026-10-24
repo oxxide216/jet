@@ -2,7 +2,7 @@ cflags = -Wall -Wextra -Ilibs/viking/include -Ilibs/viking/libs -Ilibs/viking/li
 ldflags = -lX11 -lXext -lXrandr -lXfixes -lGLX -lvulkan -lm
 build_dir = build
 shader_spvs = $build_dir/shaders/text.vert.spv $build_dir/shaders/text.frag.spv $build_dir/shaders/sel.vert.spv $build_dir/shaders/sel.frag.spv $build_dir/shaders/shape.vert.spv $build_dir/shaders/shape.frag.spv $build_dir/shaders/circle.vert.spv $build_dir/shaders/circle.frag.spv
-fonts = fonts/NordwandMono-Regular.ttf
+fonts = fonts/JetBrainsMono-Medium.ttf
 
 [jet]
 src = src/jet/**.c src/common/**.c
