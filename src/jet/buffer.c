@@ -963,6 +963,8 @@ Str  buffer_get_selection_str(Buffer *buffer) {
   StringBuilder sb = {0};
 
   for (u32 i = min_row; i <= max_row; ++i) {
+    if (i > min_row)
+      sb_push_char(&sb, '\n');
     Line *line = buffer->lines.items + i;
     u32 min = i == min_row ? min_col : 0;
     u32 max = i == max_row ? max_col : line->len;
