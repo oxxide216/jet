@@ -1278,7 +1278,7 @@ i32 main(i32 argc, char **argv) {
       while (*file_path)
         buffer[len++] = *file_path++;
       if (CURRENT_BUFFER().is_dirty)
-        buffer[len++] = U'*';
+        buffer[len++] = U'^';
       tr_set_fg_color(&str, ALT_FG_COLOR);
       f32 x = window->width - tr_measure_text(&str, buffer, len) - BUFFER_PADDING;
       tr_draw_text(&str, buffer, len, x, y);
