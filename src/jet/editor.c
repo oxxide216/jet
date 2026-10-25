@@ -380,6 +380,7 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
             new_completion.wsb.len,
           });
         DA_INSERT(*completions, i, new_completion);
+        ++i;
       }
     }
   } break;
