@@ -86,6 +86,28 @@ static void get_buffer_selection_bounds(Buffer *buffer,
   }
 }
 
+static void handle_selection_deletion(Editor *editor, MainBuffer *main_buffer) {
+  Buffer *buffer = &main_buffer->buffer;
+  if (buffer->cursor_row > buffer->anchor_row) {
+    u32 sel_height = buffer->cursor_row - buffer->anchor_row;
+    u32 prev_row = buffer->cursor_row;
+    for (u32 i = 0; i < sel_height; ++i) {
+      editor_update_inline_errors_before_action(editor, ActionRemoveLineBeforeCursor);
+      editor_update_completions_before_action(editor, ActionRemoveLineBeforeCursor, 0);
+      highlighter_update_before_action(main_buffer, ActionRemoveLineBeforeCursor);
+      --buffer->cursor_row;
+    }
+    buffer->cursor_row = prev_row;
+  } else if (buffer->anchor_row > buffer->cursor_row) {
+    u32 sel_height = buffer->anchor_row - buffer->cursor_row;
+    for (u32 i = 0; i < sel_height; ++i) {
+      editor_update_inline_errors_before_action(editor, ActionRemoveLineAtCursor);
+      editor_update_completions_before_action(editor, ActionRemoveLineAtCursor, 0);
+      highlighter_update_before_action(main_buffer, ActionRemoveLineAtCursor);
+    }
+  }
+}
+
 static CnsResult connected(CnsCtx *ctx, CnsConnection *connection) {
   Editor *editor = cns_get_user_data(ctx);
   editor->jwrap = connection;
@@ -365,6 +387,8 @@ i32 main(i32 argc, char **argv) {
                           &CURRENT_BUFFER().cursor_col,
                           &editor.search_buffer);
           } else {
+            handle_selection_deletion(&editor, &CURRENT_MAIN_BUFFER());
+
             if (CURRENT_BUFFER().cursor_col == 0) {
               editor_update_inline_errors_before_action(&editor, ActionRemoveLineBeforeCursor);
               editor_update_completions_before_action(&editor, ActionRemoveLineBeforeCursor, 0);
@@ -391,6 +415,8 @@ i32 main(i32 argc, char **argv) {
         } break;
 
         case WinxKeyCodeDelete: {
+          handle_selection_deletion(&editor, &CURRENT_MAIN_BUFFER());
+
           WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
           if (CURRENT_BUFFER().cursor_col == line.len) {
             editor_update_inline_errors_before_action(&editor, ActionRemoveLineAtCursor);
@@ -773,7 +799,7 @@ i32 main(i32 argc, char **argv) {
                 }
               }
 
-              buffer_set_selection_str(buffer, (Str) {0});
+              buffer_remove_before_cursor(buffer);
 
               if (editor.mode == JetModeEditor)
                 highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
@@ -823,6 +849,8 @@ i32 main(i32 argc, char **argv) {
       case WinxEventKindChar: {
         if (!is_ctrl_pressed && !is_alt_pressed) {
           if (editor.mode == JetModeEditor) {
+            handle_selection_deletion(&editor, &CURRENT_MAIN_BUFFER());
+
             editor_update_inline_errors_before_action(&editor, ActionInsert);
             editor_update_completions_before_action(&editor, ActionInsert,
                                                     event.as._char._char);
@@ -864,22 +892,28 @@ i32 main(i32 argc, char **argv) {
 
         u32 prev_cursor_row = CURRENT_BUFFER().cursor_row;
 
-        if (editor.mode == JetModeEditor) {
-          for (u32 i = 0; i < new_selection.len; ++i) {
-            if (new_selection.ptr[i] == '\n') {
+        while (new_selection.len > 0) {
+          u32 _char = get_wide_char(&new_selection);
+          if (_char == U'\n') {
+            if (editor.mode == JetModeEditor) {
               editor_update_inline_errors_before_action(&editor, ActionInsertLine);
               editor_update_completions_before_action(&editor, ActionInsertLine, 0);
               highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsertLine);
-            } else {
+            }
+
+            buffer_insert_new_line(buffer);
+          } else {
+            if (editor.mode == JetModeEditor) {
               editor_update_inline_errors_before_action(&editor, ActionInsert);
-              editor_update_completions_before_action(&editor, ActionInsert, new_selection.ptr[i]);
+              editor_update_completions_before_action(&editor, ActionInsert, _char);
               highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
             }
+
+            buffer_insert(buffer, _char);
           }
         }
 
-        buffer_set_selection_str(buffer, new_selection);
-        free(new_selection.ptr);
+        free(event.as.clipboard_data.data);
 
         if (editor.mode == JetModeEditor)
           highlighter_redo_line(&CURRENT_MAIN_BUFFER(), prev_cursor_row);

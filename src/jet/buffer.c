@@ -951,7 +951,7 @@ u32 buffer_get_chars_amount_for_remove_word_at_cursor(Buffer *buffer) {
   return result;
 }
 
-Str  buffer_get_selection_str(Buffer *buffer) {
+Str buffer_get_selection_str(Buffer *buffer) {
   if (!buffer->is_selecting)
     return (Str) {0};
 
@@ -977,16 +977,8 @@ Str  buffer_get_selection_str(Buffer *buffer) {
   return sb_to_str(sb);
 }
 
-void buffer_set_selection_str(Buffer *buffer, Str str) {
-  if (buffer->is_selecting) {
-    buffer_remove_selection(buffer);
-  }
-
-  while (str.len > 0) {
-    u32 _char = get_wide_char(&str);
-    if (_char == U'\n')
-      buffer_insert_new_line(buffer);
-    else
-      buffer_insert(buffer, _char);
-  }
+u32 buffer_get_selection_height(Buffer *buffer) {
+  u32 min_row, min_col, max_row, max_col;
+  get_buffer_selection_bounds(buffer, &min_row, &min_col, &max_row, &max_col);
+  return max_row - min_row;
 }

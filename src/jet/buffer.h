@@ -76,7 +76,7 @@ WideStr buffer_get_word_at_cursor(Buffer *buffer);
 u32 buffer_get_chars_amount_for_remove_word_before_cursor(Buffer *buffer);
 u32 buffer_get_chars_amount_for_remove_word_at_cursor(Buffer *buffer);
 
-Str  buffer_get_selection_str(Buffer *buffer);
-void buffer_set_selection_str(Buffer *buffer, Str str);
+Str buffer_get_selection_str(Buffer *buffer);
+u32 buffer_get_selection_height(Buffer *buffer);
 
 #endif // BUFFER_H
