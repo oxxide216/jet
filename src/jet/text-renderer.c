@@ -7,6 +7,9 @@
 #define ATLAS_WIDTH   32768
 #define ATLAS_HEIGHT  MAX_FONT_SCALE
 
+#define ONEDGE_VALUE     180
+#define PIXEL_DIST_SCALE ((f32) ONEDGE_VALUE / 2.5)
+
 typedef struct {
   u32 dummy;
 } TextVertex;
@@ -153,9 +156,10 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
   }
 
   f32 scale_y = stbtt_ScaleForPixelHeight(&atlas->font, scale);
-  i32 width = 0, height = 0;
-  u8 *bitmap = stbtt_GetCodepointBitmap(&atlas->font, 0.0, scale_y, _char,
-                                        &width, &height, NULL, NULL);
+
+  i32 width, height;
+  u8 *bitmap = stbtt_GetCodepointSDF(&atlas->font, scale_y, _char, 0, ONEDGE_VALUE,
+                                     PIXEL_DIST_SCALE, &width, &height, NULL, NULL);
 
   // Resetting in case we zoomed in/out too many times
   if (atlas->cursor_x + width + ATLAS_PADDING > ATLAS_WIDTH) {
@@ -173,9 +177,10 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
 
   atlas->cursor_x += ATLAS_PADDING;
 
-  for (u32 y = 0; y < (u32) height; ++y)
-    for (u32 x = 0; x < (u32) width; ++x)
-      atlas->data[y * ATLAS_WIDTH + x + atlas->cursor_x] = bitmap[y * width + x];
+  if (_char != U' ')
+    for (u32 y = 0; y < (u32) height; ++y)
+      for (u32 x = 0; x < (u32) width; ++x)
+        atlas->data[y * ATLAS_WIDTH + x + atlas->cursor_x] = bitmap[y * width + x];
 
   f32 o_width = (f32) width;
   f32 o_height = (f32) height;
@@ -188,7 +193,7 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
   f32 o_br_u = (f32) atlas->cursor_x / ATLAS_WIDTH;
   f32 o_br_v = (f32) height / ATLAS_HEIGHT;
 
-  free(bitmap);
+  stbtt_FreeSDF(bitmap, NULL);
 
   i32 advance, lsb;
   stbtt_GetCodepointHMetrics(&atlas->font, _char, &advance, &lsb);
@@ -196,8 +201,8 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
   i32 ascent;
   stbtt_GetFontVMetrics(&atlas->font, &ascent, NULL, NULL);
 
-  int y0;
-  stbtt_GetCodepointBitmapBox(&atlas->font, _char, 0.0, scale_y, NULL, &y0, NULL, NULL);
+  i32 y0;
+  stbtt_GetCodepointBitmapBox(&atlas->font, _char, 0, scale_y, NULL, &y0, NULL, NULL);
 
   f32 x_inner_offset = lsb * scale_y;
   f32 x_offset = advance * scale_y;

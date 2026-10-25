@@ -8,5 +8,8 @@ layout(location = 1) in vec3 i_color;
 layout(location = 0) out vec4 o_color;
 
 void main() {
-  o_color = vec4(i_color, texture(u_atlas, i_uv).r);
+  float d = texture(u_atlas, i_uv).r;
+  float aaf = fwidth(d);
+  float a = 1.0 - smoothstep(0.5 + aaf, 0.5 - aaf, d);
+  o_color = vec4(i_color, a);
 }
