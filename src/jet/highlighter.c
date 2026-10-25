@@ -226,7 +226,7 @@ void highlighter_redo_line(MainBuffer *buffer, u32 row) {
 
     iterate =
       row < rows &&
-      (row >= buffer->highlighter.states.len ||
+      (rows >= buffer->highlighter.states.len ||
        !highlighter_state_eq(buffer->highlighter.states.items + row, &state));
 
     if (iterate) {
