@@ -5,7 +5,7 @@
 
 #define ATLAS_PADDING 5
 #define ATLAS_WIDTH   32768
-#define ATLAS_HEIGHT  MAX_FONT_SCALE
+#define ATLAS_HEIGHT  FONT_RENDER_SCALE
 
 #define ONEDGE_VALUE     180
 #define PIXEL_DIST_SCALE ((f32) ONEDGE_VALUE / 2.5)
@@ -57,6 +57,8 @@ void atlas_delete(Atlas *atlas) {
   for (u32 i = 0; i < ARRAY_LEN(atlas->glyphs_cache); ++i)
     if (atlas->glyphs_cache[i].items)
       free(atlas->glyphs_cache[i].items);
+  if (atlas->glyph_mappings_cache.items)
+    free(atlas->glyph_mappings_cache.items);
 }
 
 TextRenderer tr_make(WinxWindow *window,
@@ -127,9 +129,7 @@ void tr_begin_frame(TextRenderer *tr, u32 scale,
 
 static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
                           f32 *out_inner_x, f32 *out_x, f32 *out_y,
-                          f32 *out_width, f32 *out_height,
-                          f32 *out_tl_u, f32 *out_tl_v,
-                          f32 *out_br_u, f32 *out_br_v) {
+                          f32 *out_width, f32 *out_height) {
   for (u32 i = 0; i < atlas->glyphs_cache[scale - MIN_FONT_SCALE].len; ++i) {
     Glyph *glyph = atlas->glyphs_cache[scale - MIN_FONT_SCALE].items + i;
     if (glyph->_char == _char) {
@@ -143,23 +143,71 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
         *out_width = glyph->w;
       if (out_height)
         *out_height = glyph->h;
-      if (out_tl_u)
-        *out_tl_u = glyph->tl_u;
-      if (out_tl_v)
-        *out_tl_v = glyph->tl_v;
-      if (out_br_u)
-        *out_br_u = glyph->br_u;
-      if (out_br_v)
-        *out_br_v = glyph->br_v;
       return;
     }
   }
 
   f32 scale_y = stbtt_ScaleForPixelHeight(&atlas->font, scale);
 
+  i32 advance, lsb;
+  stbtt_GetCodepointHMetrics(&atlas->font, _char, &advance, &lsb);
+
+  i32 ascent;
+  stbtt_GetFontVMetrics(&atlas->font, &ascent, NULL, NULL);
+
+  i32 x0, y0, x1, y1;
+  stbtt_GetCodepointBitmapBox(&atlas->font, _char, scale_y, scale_y, &x0, &y0, &x1, &y1);
+
+  f32 x_inner_offset = lsb * scale_y;
+  f32 x_offset = advance * scale_y;
+  f32 y_offset = ascent * scale_y + y0;
+  f32 o_width = (f32) x1 - (f32) x0;
+  f32 o_height = (f32) y1 - (f32) y0;
+
+  Glyph glyph = {
+    _char,
+    x_inner_offset,
+    x_offset, y_offset,
+    o_width, o_height,
+  };
+  DA_APPEND(atlas->glyphs_cache[scale - MIN_FONT_SCALE], glyph);
+
+  if (out_inner_x)
+    *out_inner_x += x_inner_offset;
+  if (out_x)
+    *out_x += x_offset;
+  if (out_y)
+    *out_y += y_offset;
+  if (out_width)
+    *out_width = o_width;
+  if (out_height)
+    *out_height = o_height;
+}
+
+static void get_char_mapping(Atlas *atlas, u32 _char, u32 scale,
+                             f32 *out_tl_u, f32 *out_tl_v,
+                             f32 *out_br_u, f32 *out_br_v) {
+  for (u32 i = 0; i < atlas->glyph_mappings_cache.len; ++i) {
+    GlyphMapping *mapping = atlas->glyph_mappings_cache.items + i;
+    if (mapping->_char == _char) {
+        *out_tl_u = mapping->tl_u;
+      if (out_tl_v)
+        *out_tl_v = mapping->tl_v;
+      if (out_br_u)
+        *out_br_u = mapping->br_u;
+      if (out_br_v)
+        *out_br_v = mapping->br_v;
+      return;
+    }
+  }
+
+  f32 scale_y = stbtt_ScaleForPixelHeight(&atlas->font, FONT_RENDER_SCALE);
+
   i32 width, height;
   u8 *bitmap = stbtt_GetCodepointSDF(&atlas->font, scale_y, _char, 0, ONEDGE_VALUE,
                                      PIXEL_DIST_SCALE, &width, &height, NULL, NULL);
+
+  scale_y = stbtt_ScaleForPixelHeight(&atlas->font, scale);
 
   // Resetting in case we zoomed in/out too many times
   if (atlas->cursor_x + width + ATLAS_PADDING > ATLAS_WIDTH) {
@@ -167,8 +215,7 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
 
     memset(atlas->data, 0, ATLAS_WIDTH * ATLAS_HEIGHT * sizeof(*atlas->data));
 
-    for (u32 i = 0; i < ARRAY_LEN(atlas->glyphs_cache); ++i)
-      atlas->glyphs_cache[i].len = 0;
+    atlas->glyph_mappings_cache.len = 0;
   }
 
   // If this fails, increase atlas size
@@ -182,9 +229,6 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
       for (u32 x = 0; x < (u32) width; ++x)
         atlas->data[y * ATLAS_WIDTH + x + atlas->cursor_x] = bitmap[y * width + x];
 
-  f32 o_width = (f32) width;
-  f32 o_height = (f32) height;
-
   f32 o_tl_u = (f32) atlas->cursor_x / ATLAS_WIDTH;
   f32 o_tl_v = 0.0;
 
@@ -195,40 +239,14 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
 
   stbtt_FreeSDF(bitmap, NULL);
 
-  i32 advance, lsb;
-  stbtt_GetCodepointHMetrics(&atlas->font, _char, &advance, &lsb);
-
-  i32 ascent;
-  stbtt_GetFontVMetrics(&atlas->font, &ascent, NULL, NULL);
-
-  i32 y0;
-  stbtt_GetCodepointBitmapBox(&atlas->font, _char, 0, scale_y, NULL, &y0, NULL, NULL);
-
-  f32 x_inner_offset = lsb * scale_y;
-  f32 x_offset = advance * scale_y;
-  f32 y_offset = ascent * scale_y + y0;
-
-  Glyph glyph = {
+  GlyphMapping mapping = {
     _char,
-    x_inner_offset,
-    x_offset, y_offset,
-    o_width, o_height,
     o_tl_u, o_tl_v,
     o_br_u, o_br_v,
   };
-  DA_APPEND(atlas->glyphs_cache[scale - MIN_FONT_SCALE], glyph);
+  DA_APPEND(atlas->glyph_mappings_cache, mapping);
   atlas->is_glyphs_cache_dirty = true;
 
-  if (out_inner_x)
-    *out_inner_x += x_inner_offset;
-  if (out_x)
-    *out_x += x_offset;
-  if (out_y)
-    *out_y += y_offset;
-  if (out_width)
-    *out_width = o_width;
-  if (out_height)
-    *out_height = o_height;
   if (out_tl_u)
     *out_tl_u = o_tl_u;
   if (out_tl_v)
@@ -262,8 +280,7 @@ f32 tr_measure_text(TextRenderer *tr, u32 *text, u32 text_len) {
 
   for (u32 i = 0; i < text_len; ++i)
     get_char_data(tr->atlas, text[i], tr->scale,
-                  NULL, &width, NULL, NULL, NULL,
-                  NULL, NULL, NULL, NULL);
+                  NULL, &width, NULL, NULL, NULL);
 
   return width;
 }
@@ -336,9 +353,10 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len,
     };
     get_char_data(tr->atlas, text[i], tr->scale,
                   &text_entry.x, &x, &text_entry.y,
-                  &text_entry.w, &text_entry.h,
-                  &text_entry.tl_u, &text_entry.tl_v,
-                  &text_entry.br_u, &text_entry.br_v);
+                  &text_entry.w, &text_entry.h);
+    get_char_mapping(tr->atlas, text[i], tr->scale,
+                     &text_entry.tl_u, &text_entry.tl_v,
+                     &text_entry.br_u, &text_entry.br_v);
 
     if (x > x_limit) {
       if ((tr->line_index > tr->sel_begin_row &&
@@ -432,9 +450,10 @@ void tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
     };
     get_char_data(tr->atlas, text[i], tr->scale,
                   &text_entry.x, &x, &text_entry.y,
-                  &text_entry.w, &text_entry.h,
-                  &text_entry.tl_u, &text_entry.tl_v,
-                  &text_entry.br_u, &text_entry.br_v);
+                  &text_entry.w, &text_entry.h);
+    get_char_mapping(tr->atlas, text[i], tr->scale,
+                     &text_entry.tl_u, &text_entry.tl_v,
+                     &text_entry.br_u, &text_entry.br_v);
     if (text_entry.x >= tr->x_lower_limit &&
         text_entry.x + text_entry.w < tr->x_higher_limit)
       DA_APPEND(tr->text_ssbo_data, text_entry);

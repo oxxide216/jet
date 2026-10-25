@@ -13,15 +13,22 @@ typedef struct {
   f32 x_offset;
   f32 y_offset;
   f32 w, h;
-  f32 tl_u, tl_v;
-  f32 br_u, br_v;
 } Glyph;
 
 typedef Da(Glyph) Glyphs;
 
 typedef struct {
+  u32 _char;
+  f32 tl_u, tl_v;
+  f32 br_u, br_v;
+} GlyphMapping;
+
+typedef Da(GlyphMapping) GlyphMappings;
+
+typedef struct {
   stbtt_fontinfo  font;
   Glyphs          glyphs_cache[MAX_FONT_SCALE - MIN_FONT_SCALE + 1];
+  GlyphMappings   glyph_mappings_cache;
   u8             *data;
   u32             cursor_x;
   VikInstance    *instance;
