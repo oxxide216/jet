@@ -923,7 +923,6 @@ i32 main(i32 argc, char **argv) {
     // Rendering main buffer
     {
       tr_set_bg_color(&tr, BG_COLOR);
-      tr_set_fg_color(&tr, FG_COLOR);
 
       tr.x_lower_limit = 0.0;
       tr.x_higher_limit = window->width;
@@ -933,6 +932,13 @@ i32 main(i32 argc, char **argv) {
 
       tr.line_index = CURRENT_SCROLL();
 
+      u32 buffer[64];
+      static_assert(sizeof(u32) == sizeof(wchar_t));
+      u32 len = swprintf((i32 *) buffer, ARRAY_LEN(buffer), L"%u",
+                         editor.max_visible_line_number);
+
+      f32 x_offset = tr_measure_text(&tr, buffer, len);
+
       u32 space = U' ';
       f32 space_width = tr_measure_text(&tr, &space, 1);
 
@@ -940,10 +946,19 @@ i32 main(i32 argc, char **argv) {
 
       f32 y = BUFFER_PADDING;
       for (u32 i = CURRENT_SCROLL(); i < CURRENT_BUFFER().lines.len; ++i) {
+        editor.max_visible_line_number = i + 1;
+
+        tr_set_fg_color(&tr, GREY_COLOR);
+        static_assert(sizeof(u32) == sizeof(wchar_t));
+        len = swprintf((i32 *) buffer, ARRAY_LEN(buffer), L"%u", i + 1);
+        f32 width = tr_measure_text(&tr, buffer, len);
+        tr_draw_text(&tr, buffer, len, BUFFER_PADDING * 2.0 + (x_offset - width) / 2.0, y);
+
+        tr_set_fg_color(&tr, FG_COLOR);
         WideStr line = buffer_get_line(&CURRENT_BUFFER(), i);
         f32 x;
         f32 new_y = tr_draw_line(&tr, line.ptr, line.len,
-                                 BUFFER_PADDING, y,
+                                 BUFFER_PADDING * 4.0 + x_offset, y,
                                  window->width - BUFFER_PADDING * 2.0,
                                  &x);
         if (new_y >= window->height - (f32) editor.font_scale - BUFFER_PADDING * 3.0)

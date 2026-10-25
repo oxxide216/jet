@@ -67,6 +67,8 @@ struct Editor {
 
   Searcher searcher;
   f32      search_scroll_x;
+
+  u32 max_visible_line_number;
 };
 
 MainBuffer    main_buffer_make(char *path);
