@@ -88,6 +88,9 @@ static void get_buffer_selection_bounds(Buffer *buffer,
 
 static void handle_selection_deletion(Editor *editor, MainBuffer *main_buffer) {
   Buffer *buffer = &main_buffer->buffer;
+  if (!buffer->is_selecting)
+    return;
+
   if (buffer->cursor_row > buffer->anchor_row) {
     u32 sel_height = buffer->cursor_row - buffer->anchor_row;
     u32 prev_row = buffer->cursor_row;

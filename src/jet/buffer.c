@@ -976,9 +976,3 @@ Str buffer_get_selection_str(Buffer *buffer) {
 
   return sb_to_str(sb);
 }
-
-u32 buffer_get_selection_height(Buffer *buffer) {
-  u32 min_row, min_col, max_row, max_col;
-  get_buffer_selection_bounds(buffer, &min_row, &min_col, &max_row, &max_col);
-  return max_row - min_row;
-}

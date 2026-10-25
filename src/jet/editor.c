@@ -257,7 +257,6 @@ void editor_build_completions(Editor *editor, u32 main_buffer_index) {
 void editor_update_completions_before_action(Editor *editor, Action action, u32 param) {
   MainBuffer *main_buffer =
     editor->main_buffers.items + editor->current_main_buffer_index;
-  u32 rows = buffer_get_rows(&main_buffer->buffer);
 
   switch (action) {
   case ActionInsertLine: {
@@ -291,7 +290,7 @@ void editor_update_completions_before_action(Editor *editor, Action action, u32 
   } break;
 
   case ActionRemoveLineAtCursor: {
-    if (main_buffer->buffer.cursor_row + 1 < rows) {
+    if (main_buffer->buffer.cursor_row + 1 < main_buffer->completion_lines.len) {
       Completions *completions0 =
         main_buffer->completion_lines.items + main_buffer->buffer.cursor_row;
       Completions *completions1 =
