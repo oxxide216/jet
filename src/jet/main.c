@@ -744,6 +744,18 @@ i32 main(i32 argc, char **argv) {
             winx_get_clipboard_content(window);
         } break;
 
+        case WinxKeyCodeX: {
+          if (is_ctrl_pressed) {
+            Buffer *buffer = editor_current_buffer(&editor);
+            Str selection = buffer_get_selection_str(buffer);
+            if (selection.len > 0) {
+              winx_set_clipboard_content(window, selection.ptr, selection.len);
+              free(selection.ptr);
+              buffer_set_selection_str(buffer, (Str) {0});
+            }
+          }
+        } break;
+
         case WinxKeyCodeEscape: {
           if (editor.mode == JetModeEditor) {
             editor.completing = false;
