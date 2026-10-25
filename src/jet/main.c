@@ -336,8 +336,15 @@ i32 main(i32 argc, char **argv) {
                     editor.completions_scroll = 0;
                 }
               } else {
-                for (u32 i = 0; i < SPACES_PER_TAB; ++i)
+                for (u32 i = 0; i < SPACES_PER_TAB; ++i) {
+                  editor_update_inline_errors_before_action(&editor, ActionInsert);
+                  editor_update_completions_before_action(&editor, ActionInsert, ' ');
+                  highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
+
                   buffer_insert(editor_current_buffer(&editor), ' ');
+                }
+
+                highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
               }
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
@@ -751,7 +758,25 @@ i32 main(i32 argc, char **argv) {
             if (selection.len > 0) {
               winx_set_clipboard_content(window, selection.ptr, selection.len);
               free(selection.ptr);
+
+              if (editor.mode == JetModeEditor) {
+                for (u32 i = 0; i < selection.len; ++i) {
+                  if (selection.ptr[i] == '\n') {
+                    editor_update_inline_errors_before_action(&editor, ActionRemoveLineAtCursor);
+                    editor_update_completions_before_action(&editor, ActionRemoveLineAtCursor, 0);
+                    highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineAtCursor);
+                  } else {
+                    editor_update_inline_errors_before_action(&editor, ActionRemoveAtCursor);
+                    editor_update_completions_before_action(&editor, ActionRemoveAtCursor, 1);
+                    highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveAtCursor);
+                  }
+                }
+              }
+
               buffer_set_selection_str(buffer, (Str) {0});
+
+              if (editor.mode == JetModeEditor)
+                highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
             }
           }
         } break;
@@ -801,6 +826,7 @@ i32 main(i32 argc, char **argv) {
             editor_update_inline_errors_before_action(&editor, ActionInsert);
             editor_update_completions_before_action(&editor, ActionInsert,
                                                     event.as._char._char);
+            highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
           }
 
           buffer_insert(editor_current_buffer(&editor), event.as._char._char);
@@ -835,8 +861,28 @@ i32 main(i32 argc, char **argv) {
           event.as.clipboard_data.data,
           event.as.clipboard_data.len,
         };
+
+        u32 prev_cursor_row = CURRENT_BUFFER().cursor_row;
+
+        if (editor.mode == JetModeEditor) {
+          for (u32 i = 0; i < new_selection.len; ++i) {
+            if (new_selection.ptr[i] == '\n') {
+              editor_update_inline_errors_before_action(&editor, ActionInsertLine);
+              editor_update_completions_before_action(&editor, ActionInsertLine, 0);
+              highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsertLine);
+            } else {
+              editor_update_inline_errors_before_action(&editor, ActionInsert);
+              editor_update_completions_before_action(&editor, ActionInsert, new_selection.ptr[i]);
+              highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
+            }
+          }
+        }
+
         buffer_set_selection_str(buffer, new_selection);
         free(new_selection.ptr);
+
+        if (editor.mode == JetModeEditor)
+          highlighter_redo_line(&CURRENT_MAIN_BUFFER(), prev_cursor_row);
       } break;
 
       default: break;
