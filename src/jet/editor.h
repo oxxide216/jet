@@ -67,6 +67,7 @@ struct Editor {
 
   Searcher searcher;
   f32      search_scroll_x;
+  bool     is_searching_backwards;
 
   u32 max_visible_line_number;
 };

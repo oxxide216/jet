@@ -721,6 +721,7 @@ i32 main(i32 argc, char **argv) {
           if (is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
               editor.mode = JetModeSearch;
+              editor.is_searching_backwards = is_shift_pressed;
               searcher_init(&editor.searcher, &CURRENT_BUFFER());
               buffer_reset(&editor.search_buffer);
             } else if (editor.mode == JetModeSearch) {
@@ -887,14 +888,26 @@ i32 main(i32 argc, char **argv) {
           if (editor.mode == JetModeSearch) {
             WideStr line = buffer_get_current_line(&editor.search_buffer);
             searcher_update_pattern(&editor.searcher, line);
-            if (CURRENT_BUFFER().cursor_col > 0)
-              --CURRENT_BUFFER().cursor_col;
-            if (!searcher_next_match(&editor.searcher,
-                                     &CURRENT_BUFFER().cursor_row,
-                                     &CURRENT_BUFFER().cursor_col,
-                                     line.len == 1) &&
-                CURRENT_BUFFER().cursor_col > 1)
-              ++CURRENT_BUFFER().cursor_col;
+            if (editor.is_searching_backwards) {
+              if (CURRENT_BUFFER().cursor_row + 1 <
+                  buffer_get_rows(&CURRENT_BUFFER()))
+                ++CURRENT_BUFFER().cursor_row;
+              if (!searcher_prev_match(&editor.searcher,
+                                       &CURRENT_BUFFER().cursor_row,
+                                       &CURRENT_BUFFER().cursor_col,
+                                       line.len == 1) &&
+                  CURRENT_BUFFER().cursor_row > 0)
+                --CURRENT_BUFFER().cursor_row;
+            } else {
+              if (CURRENT_BUFFER().cursor_col > 0)
+                --CURRENT_BUFFER().cursor_col;
+              if (!searcher_next_match(&editor.searcher,
+                                       &CURRENT_BUFFER().cursor_row,
+                                       &CURRENT_BUFFER().cursor_col,
+                                       line.len == 1) &&
+                  CURRENT_BUFFER().cursor_col > 1)
+                ++CURRENT_BUFFER().cursor_col;
+            }
           }
         }
       } break;
