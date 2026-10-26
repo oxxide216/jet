@@ -203,7 +203,7 @@ static void get_char_mapping(Atlas *atlas, u32 _char, u32 scale,
 
   f32 scale_y = stbtt_ScaleForPixelHeight(&atlas->font, FONT_RENDER_SCALE);
 
-  i32 width, height;
+  i32 width = 0, height = 0;
   u8 *bitmap = stbtt_GetCodepointSDF(&atlas->font, scale_y, _char, 0, ONEDGE_VALUE,
                                      PIXEL_DIST_SCALE, &width, &height, NULL, NULL);
 
