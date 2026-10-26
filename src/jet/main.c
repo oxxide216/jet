@@ -1195,115 +1195,120 @@ i32 main(i32 argc, char **argv) {
     editor.palette_alpha = target_palette_alpha;
 #endif
 
-    // Rendering command palette
-    WideStr line = buffer_get_current_line(editor_current_buffer(&editor));
+    {
+      // Rendering command palette
+      WideStr line = buffer_get_current_line(editor_current_buffer(&editor));
 
-    tr_set_bg_color(&ptr, BG_COLOR);
-    tr_set_fg_color(&ptr, FG_COLOR);
+      tr_set_bg_color(&ptr, BG_COLOR);
+      tr_set_fg_color(&ptr, FG_COLOR);
 
-    ptr.x_lower_limit =
-      window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 +
-      PALETTE_BORDER_WIDTH + BUFFER_PADDING;
-    ptr.x_higher_limit =
-      ptr.x_lower_limit +
-      window->width * PALETTE_WIDTH_FACTOR -
-      PALETTE_BORDER_WIDTH * 2.0 - BUFFER_PADDING * 2.0;
+      ptr.x_lower_limit =
+        window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 +
+        PALETTE_BORDER_WIDTH + BUFFER_PADDING;
+      ptr.x_higher_limit =
+        ptr.x_lower_limit +
+        window->width * PALETTE_WIDTH_FACTOR -
+        PALETTE_BORDER_WIDTH * 2.0 - BUFFER_PADDING * 2.0;
 
-    // Shadow
-    sr_draw_rounded_rect(&sr,
-                         window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_SHADOW_OFFSET,
-                         window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + PALETTE_SHADOW_OFFSET,
-                         window->width * PALETTE_WIDTH_FACTOR,
-                         window->height * PALETTE_HEIGHT_FACTOR * editor.palette_alpha,
-                         PALETTE_BORDER_RADIUS,
-                         SHADOW_COLOR * editor.palette_alpha,
-                         true);
-    // Border
-    sr_draw_rounded_rect(&sr,
-                         window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
-                         window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5,
-                         window->width * PALETTE_WIDTH_FACTOR,
-                         window->height * PALETTE_HEIGHT_FACTOR * editor.palette_alpha,
-                         PALETTE_BORDER_RADIUS, FG_COLOR,
-                         editor.palette_alpha, false);
-    // Inner
-    sr_draw_rounded_rect(&sr,
-                         window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
-                         window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
-                         window->width * PALETTE_WIDTH_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
-                         (window->height * PALETTE_HEIGHT_FACTOR - PALETTE_BORDER_WIDTH * 2.0) * editor.palette_alpha,
-                         PALETTE_BORDER_RADIUS - PALETTE_BORDER_WIDTH, BG_COLOR,
-                         editor.palette_alpha, false);
-    // Separator
-    sr_draw_rect(&sr,
-                 window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
-                 window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 2.0 + PALETTE_BORDER_WIDTH + (f32) editor.font_scale,
-                 window->width * PALETTE_WIDTH_FACTOR,
-                 PALETTE_BORDER_WIDTH,
-                 FG_COLOR, editor.palette_alpha);
+      // Shadow
+      sr_draw_rounded_rect(&sr,
+                           window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_SHADOW_OFFSET,
+                           window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + PALETTE_SHADOW_OFFSET,
+                           window->width * PALETTE_WIDTH_FACTOR,
+                           window->height * PALETTE_HEIGHT_FACTOR * editor.palette_alpha,
+                           PALETTE_BORDER_RADIUS,
+                           SHADOW_COLOR * editor.palette_alpha,
+                           true);
+      // Border
+      sr_draw_rounded_rect(&sr,
+                           window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
+                           window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5,
+                           window->width * PALETTE_WIDTH_FACTOR,
+                           window->height * PALETTE_HEIGHT_FACTOR * editor.palette_alpha,
+                           PALETTE_BORDER_RADIUS, FG_COLOR,
+                           editor.palette_alpha, false);
+      // Inner
+      sr_draw_rounded_rect(&sr,
+                           window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
+                           window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
+                           window->width * PALETTE_WIDTH_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
+                           (window->height * PALETTE_HEIGHT_FACTOR - PALETTE_BORDER_WIDTH * 2.0) * editor.palette_alpha,
+                           PALETTE_BORDER_RADIUS - PALETTE_BORDER_WIDTH, BG_COLOR,
+                           editor.palette_alpha, false);
+      // Separator
+      sr_draw_rect(&sr,
+                   window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
+                   window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 2.0 + PALETTE_BORDER_WIDTH + (f32) editor.font_scale,
+                   window->width * PALETTE_WIDTH_FACTOR,
+                   PALETTE_BORDER_WIDTH,
+                   FG_COLOR, editor.palette_alpha);
 
-    if (editor.palette_alpha >= 0.5) {
-      f32 line0_width =
-        tr_measure_text(&ptr, line.ptr, editor.palette_buffer.cursor_col);
+      if (editor.palette_alpha >= 0.5) {
+        f32 line0_width =
+          tr_measure_text(&ptr, line.ptr, editor.palette_buffer.cursor_col);
 
-      f32 line1_width;
-      if (editor.palette_buffer.cursor_col < line.len) {
-        line1_width =
-          tr_measure_text(&ptr, line.ptr, editor.palette_buffer.cursor_col + 1);
-      } else {
-        u32 space = U' ';
-        line1_width =
-          tr_measure_text(&ptr, line.ptr, editor.palette_buffer.cursor_col) +
-          tr_measure_text(&ptr, &space, 1);
-      }
-
-      if (line0_width - editor.palette_scroll_x < 0.0)
-        editor.palette_scroll_x = line0_width;
-      else if (line1_width - editor.palette_scroll_x >
-               window->width * PALETTE_WIDTH_FACTOR -
-               PALETTE_BORDER_WIDTH * 2.0 -
-               BUFFER_PADDING * 2.0)
-        editor.palette_scroll_x =
-          line1_width -
-          (window->width * PALETTE_WIDTH_FACTOR -
-           PALETTE_BORDER_WIDTH * 2.0 -
-           BUFFER_PADDING * 2.0);
-
-      tr_draw_line(&ptr, line.ptr, line.len,
-                   window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH - editor.palette_scroll_x,
-                   window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH,
-                   INFINITY, NULL);
-
-      editor.provider->free_opts(editor.options);
-      editor.options = editor.provider->get_opts(&editor, line);
-
-      if (editor.palette_scroll_y > editor.selected_option)
-        editor.palette_scroll_y = editor.selected_option;
-
-      for (u32 i = editor.palette_scroll_y; i < editor.options.len; ++i) {
-        PaletteOption *option = editor.options.items + i;
-        f32 x = window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH;
-        f32 y = window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 3.0 + PALETTE_BORDER_WIDTH + (f32) editor.font_scale * (i + 1);
-
-        if (window->height - y - (f32) editor.font_scale < window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH)
-          break;
-
-        if (i == editor.selected_option) {
-          tr_set_bg_color(&ptr, option->fg_r, option->fg_g, option->fg_b);
-          tr_set_fg_color(&ptr, option->bg_r, option->bg_g, option->bg_b);
-
-          sr_draw_rect(&sr,
-                       window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
-                       y,
-                       window->width * PALETTE_WIDTH_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
-                       (f32) editor.font_scale,
-                       ACC_COLOR, editor.palette_alpha);
+        f32 line1_width;
+        if (editor.palette_buffer.cursor_col < line.len) {
+          line1_width =
+            tr_measure_text(&ptr, line.ptr, editor.palette_buffer.cursor_col + 1);
         } else {
-          tr_set_bg_color(&ptr, option->bg_r, option->bg_g, option->bg_b);
-          tr_set_fg_color(&ptr, option->fg_r, option->fg_g, option->fg_b);
+          u32 space = U' ';
+          line1_width =
+            tr_measure_text(&ptr, line.ptr, editor.palette_buffer.cursor_col) +
+            tr_measure_text(&ptr, &space, 1);
         }
 
-        tr_draw_text(&ptr, option->name.ptr, option->name.len, x, y);
+        if (line0_width - editor.palette_scroll_x < 0.0)
+          editor.palette_scroll_x = line0_width;
+        else if (line1_width - editor.palette_scroll_x >
+                 window->width * PALETTE_WIDTH_FACTOR -
+                 PALETTE_BORDER_WIDTH * 2.0 -
+                 BUFFER_PADDING * 2.0)
+          editor.palette_scroll_x =
+            line1_width -
+            (window->width * PALETTE_WIDTH_FACTOR -
+             PALETTE_BORDER_WIDTH * 2.0 -
+             BUFFER_PADDING * 2.0);
+
+        tr_draw_line(&ptr, line.ptr, line.len,
+                     window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH - editor.palette_scroll_x,
+                     window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH,
+                     INFINITY, NULL);
+
+        editor.provider->free_opts(editor.options);
+        editor.options = editor.provider->get_opts(&editor, line);
+
+        if (editor.palette_scroll_y > editor.selected_option)
+          editor.palette_scroll_y = editor.selected_option;
+
+        for (u32 i = editor.palette_scroll_y; i < editor.options.len; ++i) {
+          PaletteOption *option = editor.options.items + i;
+          f32 x = window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH;
+          f32 y = window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 3.0 + PALETTE_BORDER_WIDTH * 2.0 + (f32) editor.font_scale * (i + 1 - editor.palette_scroll_y);
+
+          if (window->height - y - (f32) editor.font_scale < window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING + PALETTE_BORDER_WIDTH * 2.0) {
+            if (i <= editor.selected_option)
+              ++editor.palette_scroll_y;
+            break;
+          }
+
+          if (i == editor.selected_option) {
+            tr_set_bg_color(&ptr, option->fg_r, option->fg_g, option->fg_b);
+            tr_set_fg_color(&ptr, option->bg_r, option->bg_g, option->bg_b);
+
+            sr_draw_rect(&sr,
+                         window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
+                         y,
+                         window->width * PALETTE_WIDTH_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
+                         (f32) editor.font_scale,
+                         ACC_COLOR, editor.palette_alpha);
+          } else {
+            tr_set_bg_color(&ptr, option->bg_r, option->bg_g, option->bg_b);
+            tr_set_fg_color(&ptr, option->fg_r, option->fg_g, option->fg_b);
+          }
+
+          tr_draw_text(&ptr, option->name.ptr, option->name.len, x, y);
+        }
       }
     }
 
