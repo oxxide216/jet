@@ -1414,6 +1414,8 @@ i32 main(i32 argc, char **argv) {
 
   cns_destroy(cns);
 
+  remove_file(socket_path);
+
   if (editor.actual_completions.items)
     free(editor.actual_completions.items);
   buffer_delete(&editor.palette_buffer);

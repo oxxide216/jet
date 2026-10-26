@@ -32,3 +32,7 @@ Str get_current_dir(void) {
   memcpy(result.ptr, buffer, result.len * sizeof(*result.ptr));
   return result;
 }
+
+void remove_file(char *path) {
+  unlink(path);
+}

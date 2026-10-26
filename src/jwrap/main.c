@@ -259,31 +259,30 @@ i32 main(i32 argc, char **argv) {
       if (server_connection) {
         parse_entries(&entries, &stream);
 
-        if (entries.len > 0) {
-          ByteBuffer buffer = {0};
+        ByteBuffer buffer = {0};
 
-          for (u32 i = 0; i < sizeof(u32); ++i)
-            DA_APPEND(buffer, ((u8 *) &entries.len)[i]);
+        u32 len = entries.len + 1;
+        for (u32 i = 0; i < sizeof(u32); ++i)
+          DA_APPEND(buffer, ((u8 *) &len)[i]);
 
-          Message message = { MessageKindRerun, {} };
+        Message message = { MessageKindRerun, {} };
+        encode_message(&buffer, &message);
+
+        for (u32 i = 0; i < entries.len; ++i) {
+          Message message = { MessageKindEntry, { entries.items[i] } };
           encode_message(&buffer, &message);
+        }
 
-          for (u32 i = 0; i < entries.len; ++i) {
-            Message message = { MessageKindEntry, { entries.items[i] } };
-            encode_message(&buffer, &message);
-          }
-
-          while (!cns_unix_send(server_connection, buffer.items, buffer.len))
+        while (!cns_unix_send(server_connection, buffer.items, buffer.len))
           if (buffer.items)
             free(buffer.items);
-          for (u32 i = 0; i < entries.len; ++i) {
-            free(entries.items[i].file_path.ptr);
-            free(entries.items[i].message.ptr);
-          }
-          entries.len = 0;
-          stream.len = 0;
-          stream_cursor = 0;
+        for (u32 i = 0; i < entries.len; ++i) {
+          free(entries.items[i].file_path.ptr);
+          free(entries.items[i].message.ptr);
         }
+        entries.len = 0;
+        stream.len = 0;
+        stream_cursor = 0;
       }
     }
 
