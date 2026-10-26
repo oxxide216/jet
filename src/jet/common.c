@@ -87,8 +87,8 @@ u32 read_wide_char(FILE *stream) {
     if (!((ptr[0] >> offset_table[i]) & 1))
       break;
     ptr[i + 1] = getc(stream);
-  if (ptr[i + 1] == EOF)
-    return (u32) -1;
+    if (ptr[i + 1] == EOF)
+      return (u32) -1;
   }
 
   return *(u32 *) ptr;
