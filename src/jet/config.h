@@ -14,11 +14,11 @@
 #define LINE_WRAP_MARKER U"→"
 
 // General
-#define MAX_FONT_SCALE     240
-#define MIN_FONT_SCALE     20
-#define DEFAULT_FONT_SCALE 24
-#define FONT_RENDER_SCALE  64
-#define SHADOW_COLOR       0.0, 0.0, 0.0, 0.5
+#define MAX_FONT_SCALE        240
+#define MIN_FONT_SCALE        20
+#define MAX_STATUS_FONT_SCALE 60
+#define DEFAULT_FONT_SCALE    24
+#define FONT_RENDER_SCALE     64
 
 // Main buffer
 #define BUFFER_PADDING        10.0
@@ -41,6 +41,7 @@
 #define COMPLETIONS_WINDOW_BORDER_WIDTH 2.0
 
 // Colors
+#define SHADOW_COLOR  0.0, 0.0, 0.0, 0.5
 #define BG_COLOR      0x18/255.0, 0x18/255.0, 0x18/255.0
 #define FG_COLOR      0x86/255.0, 0x8a/255.0, 0xac/255.0
 #define ACC_COLOR     0x82/255.0, 0x53/255.0, 0xa1/255.0

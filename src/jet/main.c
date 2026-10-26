@@ -982,6 +982,8 @@ i32 main(i32 argc, char **argv) {
 
     cns_step(cns, 1);
 
+    u32 status_font_scale = editor.font_scale > MAX_STATUS_FONT_SCALE ? MAX_STATUS_FONT_SCALE : editor.font_scale;
+
     if (!vik_begin_frame(executor, BG_COLOR, 1.0)) {
       winx_draw(window);
       continue;
@@ -1002,7 +1004,7 @@ i32 main(i32 argc, char **argv) {
                      max_row, max_col);
     }
     sr_begin_frame(&sr);
-    tr_begin_frame(&str, editor.font_scale, 0, 0, 0, 0);
+    tr_begin_frame(&str, status_font_scale, 0, 0, 0, 0);
     {
       u32 min_row, min_col, max_row, max_col;
       get_buffer_selection_bounds(&CURRENT_BUFFER(),
@@ -1332,13 +1334,13 @@ i32 main(i32 argc, char **argv) {
       tr_set_bg_color(&str, ALT_BG_COLOR);
       tr_set_fg_color(&str, ALT_FG_COLOR);
 
-      f32 y = window->height - ((f32) editor.font_scale + BUFFER_PADDING);
+      f32 y = window->height - ((f32) status_font_scale + BUFFER_PADDING);
 
       sr_draw_rect(&sr,
                    0.0,
                    y,
                    window->width,
-                   (f32) editor.font_scale + BUFFER_PADDING,
+                   (f32) status_font_scale + BUFFER_PADDING,
                    ALT_BG_COLOR, 1.0);
 
       y += BUFFER_PADDING * 0.5;
