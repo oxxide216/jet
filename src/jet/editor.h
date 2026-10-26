@@ -50,6 +50,7 @@ struct Editor {
   u32             selected_option;
   f32             palette_scroll_x;
   u32             palette_scroll_y;
+  f32             palette_alpha;
 
   JetMode mode;
 

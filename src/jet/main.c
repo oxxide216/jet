@@ -1182,53 +1182,67 @@ i32 main(i32 argc, char **argv) {
       }
     }
 
-    if (editor.mode == JetModeCommandPalette) {
-      // Rendering command palette
-      WideStr line = buffer_get_current_line(editor_current_buffer(&editor));
+    f32 target_palette_alpha = (f32) (editor.mode == JetModeCommandPalette);
+#if PALETTE_FADE
+    f32 t;
+    if (editor.mode == JetModeCommandPalette)
+      t = window->delta_time * PALETTE_FADE_IN_SPEED;
+    else
+      t = window->delta_time * PALETTE_FADE_OUT_SPEED;
+    editor.palette_alpha =
+      editor.palette_alpha * (1.0 - t) + target_palette_alpha * t;
+#else
+    editor.palette_alpha = target_palette_alpha;
+#endif
 
-      tr_set_bg_color(&ptr, BG_COLOR);
-      tr_set_fg_color(&ptr, FG_COLOR);
+    // Rendering command palette
+    WideStr line = buffer_get_current_line(editor_current_buffer(&editor));
 
-      ptr.x_lower_limit =
-        window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 +
-        PALETTE_BORDER_WIDTH + BUFFER_PADDING;
-      ptr.x_higher_limit =
-        ptr.x_lower_limit +
-        window->width * PALETTE_WIDTH_FACTOR -
-        PALETTE_BORDER_WIDTH * 2.0 - BUFFER_PADDING * 2.0;
+    tr_set_bg_color(&ptr, BG_COLOR);
+    tr_set_fg_color(&ptr, FG_COLOR);
 
-      // Shadow
-      sr_draw_rounded_rect(&sr,
-                           window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_SHADOW_OFFSET,
-                           window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + PALETTE_SHADOW_OFFSET,
-                           window->width * PALETTE_WIDTH_FACTOR,
-                           window->height * PALETTE_HEIGHT_FACTOR,
-                           PALETTE_BORDER_RADIUS, SHADOW_COLOR, true);
-      // Border
-      sr_draw_rounded_rect(&sr,
-                           window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
-                           window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5,
-                           window->width * PALETTE_WIDTH_FACTOR,
-                           window->height * PALETTE_HEIGHT_FACTOR,
-                           PALETTE_BORDER_RADIUS, FG_COLOR,
-                           PALETTE_ALPHA == 1.0 ? PALETTE_ALPHA : PALETTE_ALPHA / 2.0,
-                           false);
-      // Inner
-      sr_draw_rounded_rect(&sr,
-                           window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
-                           window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
-                           window->width * PALETTE_WIDTH_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
-                           window->height * PALETTE_HEIGHT_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
-                           PALETTE_BORDER_RADIUS - PALETTE_BORDER_WIDTH, BG_COLOR, PALETTE_ALPHA,
-                           false);
-      // Separator
-      sr_draw_rect(&sr,
-                   window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
-                   window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 2.0 + PALETTE_BORDER_WIDTH + (f32) editor.font_scale,
-                   window->width * PALETTE_WIDTH_FACTOR,
-                   PALETTE_BORDER_WIDTH,
-                   FG_COLOR, PALETTE_ALPHA);
+    ptr.x_lower_limit =
+      window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 +
+      PALETTE_BORDER_WIDTH + BUFFER_PADDING;
+    ptr.x_higher_limit =
+      ptr.x_lower_limit +
+      window->width * PALETTE_WIDTH_FACTOR -
+      PALETTE_BORDER_WIDTH * 2.0 - BUFFER_PADDING * 2.0;
 
+    // Shadow
+    sr_draw_rounded_rect(&sr,
+                         window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_SHADOW_OFFSET,
+                         window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + PALETTE_SHADOW_OFFSET,
+                         window->width * PALETTE_WIDTH_FACTOR,
+                         window->height * PALETTE_HEIGHT_FACTOR * editor.palette_alpha,
+                         PALETTE_BORDER_RADIUS,
+                         SHADOW_COLOR * editor.palette_alpha,
+                         true);
+    // Border
+    sr_draw_rounded_rect(&sr,
+                         window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
+                         window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5,
+                         window->width * PALETTE_WIDTH_FACTOR,
+                         window->height * PALETTE_HEIGHT_FACTOR * editor.palette_alpha,
+                         PALETTE_BORDER_RADIUS, FG_COLOR,
+                         editor.palette_alpha, false);
+    // Inner
+    sr_draw_rounded_rect(&sr,
+                         window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
+                         window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + PALETTE_BORDER_WIDTH,
+                         window->width * PALETTE_WIDTH_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
+                         (window->height * PALETTE_HEIGHT_FACTOR - PALETTE_BORDER_WIDTH * 2.0) * editor.palette_alpha,
+                         PALETTE_BORDER_RADIUS - PALETTE_BORDER_WIDTH, BG_COLOR,
+                         editor.palette_alpha, false);
+    // Separator
+    sr_draw_rect(&sr,
+                 window->width * (1.0 - PALETTE_WIDTH_FACTOR) * 0.5,
+                 window->height * (1.0 - PALETTE_HEIGHT_FACTOR) * 0.5 + BUFFER_PADDING * 2.0 + PALETTE_BORDER_WIDTH + (f32) editor.font_scale,
+                 window->width * PALETTE_WIDTH_FACTOR,
+                 PALETTE_BORDER_WIDTH,
+                 FG_COLOR, editor.palette_alpha);
+
+    if (editor.palette_alpha >= 0.5) {
       f32 line0_width =
         tr_measure_text(&ptr, line.ptr, editor.palette_buffer.cursor_col);
 
@@ -1283,7 +1297,7 @@ i32 main(i32 argc, char **argv) {
                        y,
                        window->width * PALETTE_WIDTH_FACTOR - PALETTE_BORDER_WIDTH * 2.0,
                        (f32) editor.font_scale,
-                       ACC_COLOR, PALETTE_ALPHA);
+                       ACC_COLOR, editor.palette_alpha);
         } else {
           tr_set_bg_color(&ptr, option->bg_r, option->bg_g, option->bg_b);
           tr_set_fg_color(&ptr, option->fg_r, option->fg_g, option->fg_b);
@@ -1291,7 +1305,9 @@ i32 main(i32 argc, char **argv) {
 
         tr_draw_text(&ptr, option->name.ptr, option->name.len, x, y);
       }
-    } else if (editor.mode == JetModeSearch) {
+    }
+
+    if (editor.mode == JetModeSearch) {
       tr_set_bg_color(&ptr, ALT_BG_COLOR);
       tr_set_fg_color(&ptr, ALT_FG_COLOR);
 
