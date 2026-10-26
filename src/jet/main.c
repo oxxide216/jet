@@ -311,10 +311,25 @@ i32 main(i32 argc, char **argv) {
                 while (CURRENT_BUFFER().cursor_col < line.len &&
                        is_part_of_word(line.ptr[CURRENT_BUFFER().cursor_col]))
                   ++CURRENT_BUFFER().cursor_col;
-                for (u32 i = 0; i < word.len; ++i)
+
+                for (u32 i = 0; i < word.len; ++i) {
+                  editor_update_inline_errors_before_action(&editor, ActionRemoveBeforeCursor);
+                  editor_update_completions_before_action(&editor, ActionRemoveBeforeCursor, ' ');
+                  highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveBeforeCursor);
+
                   buffer_remove_before_cursor(&CURRENT_BUFFER());
-                for (u32 i = 0; i < completion->wsb.len; ++i)
+                }
+
+                for (u32 i = 0; i < completion->wsb.len; ++i) {
+                  editor_update_inline_errors_before_action(&editor, ActionInsert);
+                  editor_update_completions_before_action(&editor, ActionInsert, ' ');
+                  highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
+
                   buffer_insert(&CURRENT_BUFFER(), completion->wsb.items[i]);
+                }
+
+                highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
+
                 editor.completing = false;
               } else {
                 editor_update_inline_errors_before_action(&editor, ActionInsertLine);
