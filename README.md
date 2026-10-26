@@ -14,6 +14,7 @@ Apart from basic editing features, Jet has these additional ones:
 - Autocompletion: collects words from all open buffers, dynamically updates, works fine on a file with 36938 lines of code and many prefix duplications.
 - Incremental syntax highlighting: fast and easily extendable (but right now only for C and Rust)
 - Fast incremental search: works just fine even on the same big file from autocompletion test
+- SDF font rendering: crisp text of any size
 
 ## Quick start
 
