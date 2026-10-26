@@ -719,19 +719,17 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeF: {
           if (is_ctrl_pressed) {
-            if (is_shift_pressed) {
-              if (editor.mode == JetModeSearch) {
-                searcher_undo(&editor.searcher,
-                              &CURRENT_BUFFER().cursor_row,
-                              &CURRENT_BUFFER().cursor_col,
-                              &editor.search_buffer);
-              }
-            } else {
-              if (editor.mode == JetModeEditor) {
-                editor.mode = JetModeSearch;
-                searcher_init(&editor.searcher, &CURRENT_BUFFER());
-                buffer_reset(&editor.search_buffer);
-              } else if (editor.mode == JetModeSearch) {
+            if (editor.mode == JetModeEditor) {
+              editor.mode = JetModeSearch;
+              searcher_init(&editor.searcher, &CURRENT_BUFFER());
+              buffer_reset(&editor.search_buffer);
+            } else if (editor.mode == JetModeSearch) {
+              if (is_shift_pressed) {
+                searcher_prev_match(&editor.searcher,
+                                    &CURRENT_BUFFER().cursor_row,
+                                    &CURRENT_BUFFER().cursor_col,
+                                    true);
+              } else {
                 searcher_next_match(&editor.searcher,
                                     &CURRENT_BUFFER().cursor_row,
                                     &CURRENT_BUFFER().cursor_col,

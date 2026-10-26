@@ -32,6 +32,7 @@ typedef struct {
 void searcher_init(Searcher *searcher, Buffer *buffer);
 void searcher_update_pattern(Searcher *searcher, WideStr pattern);
 bool searcher_next_match(Searcher *searcher, u32 *row, u32 *col, bool add_to_historty);
+bool searcher_prev_match(Searcher *searcher, u32 *row, u32 *col, bool add_to_historty);
 bool searcher_undo(Searcher *searcher, u32 *row, u32 *col, Buffer *search_buffer);
 bool searcher_has_succesful_searches_in_history(Searcher *searcher);
 void searcher_delete(Searcher *searcher);

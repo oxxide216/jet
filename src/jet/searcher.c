@@ -51,6 +51,35 @@ bool searcher_next_match(Searcher *searcher, u32 *row, u32 *col, bool add_to_his
   return false;
 }
 
+bool searcher_prev_match(Searcher *searcher, u32 *row, u32 *col, bool add_to_historty) {
+  for (u32 i = *row; i > 0; --i) {
+    WideStr line = buffer_get_line(searcher->buffer, i - 1);
+    if (line.len < searcher->pattern.len)
+      continue;
+    for (u32 j = line.len - searcher->pattern.len + 1; j > 0; --j) {
+      WideStr sub_line = { line.ptr + j - 1, searcher->pattern.len };
+      if (wide_str_eq(sub_line, searcher->pattern)) {
+        if (add_to_historty) {
+          SearchHistoryItem item = {
+            SearchHistoryItemKindNextMatch,
+            {
+              .prev_match_row = *row,
+              .prev_match_col = *col,
+            },
+          };
+          DA_APPEND(searcher->history, item);
+        }
+
+        *row = i - 1;
+        *col = j - 1;
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 bool searcher_undo(Searcher *searcher, u32 *row, u32 *col, Buffer *search_buffer) {
   if (searcher->history.len == 0)
     return false;
