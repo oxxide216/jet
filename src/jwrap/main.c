@@ -238,6 +238,9 @@ i32 main(i32 argc, char **argv) {
     exit(1);
   }
 
+  while (!server_connection)
+    cns_step(cns, 1000);
+
   Stream stream;
   stream.len = 0;
   stream.cap = 1024;
