@@ -17,7 +17,7 @@
 #define MAX_FONT_SCALE     240
 #define MIN_FONT_SCALE     24
 #define DEFAULT_FONT_SCALE 28
-#define FONT_RENDER_SCALE  48
+#define FONT_RENDER_SCALE  64
 #define SHADOW_COLOR       0.0, 0.0, 0.0, 0.5
 
 // Main buffer
