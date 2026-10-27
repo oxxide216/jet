@@ -342,11 +342,9 @@ i32 main(i32 argc, char **argv) {
               }
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {
-                if (editor.provider->execute(&editor, editor.options, editor.selected_option)) {
+                if (editor.provider->execute(&editor, editor.options, editor.selected_option))
                   editor.mode = JetModeEditor;
-                } else {
-                  buffer_reset(&editor.palette_buffer);
-                }
+                buffer_reset(&editor.palette_buffer);
               }
             } else if (editor.mode == JetModeSearch) {
               searcher_delete(&editor.searcher);
