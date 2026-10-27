@@ -505,9 +505,11 @@ i32 main(i32 argc, char **argv) {
               if (is_alt_pressed) {
                 u32 len = editor.errors.len + editor.warnings.len + editor.infos.len;
                 if (editor.entry_cursor == (u32) -1) {
-                  editor.entry_cursor = 0;
-                  if (editor.entry_cursor < len)
-                    editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
+                  if (len > 0) {
+                    editor.entry_cursor = 0;
+                    if (editor.entry_cursor < len)
+                      editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
+                  }
                 } else if (editor.entry_cursor + 1 < len) {
                   ++editor.entry_cursor;
                   editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
@@ -544,14 +546,15 @@ i32 main(i32 argc, char **argv) {
           if (editor.mode == JetModeEditor) {
             if (is_ctrl_pressed) {
               if (is_alt_pressed) {
-                if (editor.entry_cursor == (u32) -1) {
-                  u32 len = editor.errors.len + editor.warnings.len + editor.infos.len;
-                  editor.entry_cursor = len == 0 ? 0 : len - 1;
-                  if (editor.entry_cursor < len)
+                u32 len = editor.errors.len + editor.warnings.len + editor.infos.len;
+                if (len > 0) {
+                  if (editor.entry_cursor == (u32) -1) {
+                    editor.entry_cursor = len - 1;
                     editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
-                } else if (editor.entry_cursor > 0) {
-                  --editor.entry_cursor;
-                  editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
+                  } else if (editor.entry_cursor > 0) {
+                    --editor.entry_cursor;
+                    editor_go_to_entry(&editor, editor_get_entry(&editor, editor.entry_cursor));
+                  }
                 }
               } else {
                 buffer_move_up_paragraph(editor_current_buffer(&editor), is_shift_pressed);
