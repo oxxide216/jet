@@ -24,7 +24,7 @@ Jet uses [my custom build system](https://github.com/oxxide216/nsb).
 git clone --recursive https://github.com/oxxide216/jet
 cd jet
 cc -o nsb nsb.c
-./nsb
+./nsb -a
 ./jet
 ```
 
