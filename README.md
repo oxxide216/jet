@@ -30,7 +30,7 @@ cc -o nsb nsb.c
 
 ## Why?
 
-Jet is not a VS Code, Vim, Neovim, Emacs or *yout favourite IDE* killer.
+Jet is not a VS Code, Vim, Neovim, Emacs or *your favourite IDE* killer.
 I just wanted to create something that I could use daily myself.
 This is why main roadmap for Jet - features that *I* need daily.
 I don't want my editor to be Electron bloat. I don't need many IDE features.
