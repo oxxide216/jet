@@ -302,10 +302,11 @@ i32 main(i32 argc, char **argv) {
         case WinxKeyCodeEnter: {
           if (!is_ctrl_pressed) {
             if (editor.mode == JetModeEditor) {
+              WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
               if (editor.completing &&
-                  editor.completions_scroll < editor.actual_completions.len) {
+                  editor.completions_scroll < editor.actual_completions.len &&
+                  word.len >= MINIMAL_COMPLETION_PREFIX_LENGTH) {
                 WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
-                WideStr word = buffer_get_word_at_cursor(&CURRENT_BUFFER());
                 Completion *completion =
                   editor.actual_completions.items + editor.completions_scroll;
                 while (CURRENT_BUFFER().cursor_col < line.len &&
