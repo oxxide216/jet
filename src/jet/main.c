@@ -96,7 +96,7 @@ static void handle_selection_deletion(Editor *editor, MainBuffer *main_buffer) {
     u32 prev_row = buffer->cursor_row;
     for (u32 i = 0; i < sel_height; ++i) {
       editor_update_inline_errors_before_action(editor, ActionRemoveLineBeforeCursor);
-      editor_update_completions_before_action(editor, ActionRemoveLineBeforeCursor, 0);
+      editor_update_completions_before_action(editor, ActionRemoveLineBeforeCursor);
       highlighter_update_before_action(main_buffer, ActionRemoveLineBeforeCursor);
       --buffer->cursor_row;
     }
@@ -105,7 +105,7 @@ static void handle_selection_deletion(Editor *editor, MainBuffer *main_buffer) {
     u32 sel_height = buffer->anchor_row - buffer->cursor_row;
     for (u32 i = 0; i < sel_height; ++i) {
       editor_update_inline_errors_before_action(editor, ActionRemoveLineAtCursor);
-      editor_update_completions_before_action(editor, ActionRemoveLineAtCursor, 0);
+      editor_update_completions_before_action(editor, ActionRemoveLineAtCursor);
       highlighter_update_before_action(main_buffer, ActionRemoveLineAtCursor);
     }
   }
@@ -314,7 +314,7 @@ i32 main(i32 argc, char **argv) {
 
                 for (u32 i = 0; i < word.len; ++i) {
                   editor_update_inline_errors_before_action(&editor, ActionRemoveBeforeCursor);
-                  editor_update_completions_before_action(&editor, ActionRemoveBeforeCursor, ' ');
+                  editor_update_completions_before_action(&editor, ActionRemoveBeforeCursor);
                   highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveBeforeCursor);
 
                   buffer_remove_before_cursor(&CURRENT_BUFFER());
@@ -322,7 +322,7 @@ i32 main(i32 argc, char **argv) {
 
                 for (u32 i = 0; i < completion->wsb.len; ++i) {
                   editor_update_inline_errors_before_action(&editor, ActionInsert);
-                  editor_update_completions_before_action(&editor, ActionInsert, ' ');
+                  editor_update_completions_before_action(&editor, ActionInsert);
                   highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
 
                   buffer_insert(&CURRENT_BUFFER(), completion->wsb.items[i]);
@@ -333,7 +333,7 @@ i32 main(i32 argc, char **argv) {
                 editor.completing = false;
               } else {
                 editor_update_inline_errors_before_action(&editor, ActionInsertLine);
-                editor_update_completions_before_action(&editor, ActionInsertLine, 0);
+                editor_update_completions_before_action(&editor, ActionInsertLine);
                 highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsertLine);
 
                 buffer_insert_new_line(&CURRENT_BUFFER());
@@ -376,7 +376,7 @@ i32 main(i32 argc, char **argv) {
               } else {
                 for (u32 i = 0; i < SPACES_PER_TAB; ++i) {
                   editor_update_inline_errors_before_action(&editor, ActionInsert);
-                  editor_update_completions_before_action(&editor, ActionInsert, ' ');
+                  editor_update_completions_before_action(&editor, ActionInsert);
                   highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
 
                   buffer_insert(editor_current_buffer(&editor), ' ');
@@ -407,18 +407,11 @@ i32 main(i32 argc, char **argv) {
 
             if (CURRENT_BUFFER().cursor_col == 0) {
               editor_update_inline_errors_before_action(&editor, ActionRemoveLineBeforeCursor);
-              editor_update_completions_before_action(&editor, ActionRemoveLineBeforeCursor, 0);
+              editor_update_completions_before_action(&editor, ActionRemoveLineBeforeCursor);
               highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineBeforeCursor);
             } else {
-              u32 amount;
-              if (is_ctrl_pressed)
-                amount =
-                  buffer_get_chars_amount_for_remove_word_before_cursor(&CURRENT_BUFFER());
-              else
-                amount = 1;
-
               editor_update_inline_errors_before_action(&editor, ActionRemoveBeforeCursor);
-              editor_update_completions_before_action(&editor, ActionRemoveBeforeCursor, amount);
+              editor_update_completions_before_action(&editor, ActionRemoveBeforeCursor);
             }
 
             if (is_ctrl_pressed)
@@ -438,15 +431,8 @@ i32 main(i32 argc, char **argv) {
             editor_update_inline_errors_before_action(&editor, ActionRemoveLineAtCursor);
             highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineAtCursor);
           } else {
-            u32 amount;
-            if (is_ctrl_pressed)
-              amount =
-                buffer_get_chars_amount_for_remove_word_at_cursor(&CURRENT_BUFFER());
-            else
-              amount = 1;
-
             editor_update_inline_errors_before_action(&editor, ActionRemoveAtCursor);
-            editor_update_completions_before_action(&editor, ActionRemoveAtCursor, amount);
+            editor_update_completions_before_action(&editor, ActionRemoveAtCursor);
           }
 
           if (is_ctrl_pressed)
@@ -465,7 +451,6 @@ i32 main(i32 argc, char **argv) {
                   --editor.current_main_buffer_index;
                 else
                   editor.current_main_buffer_index = editor.main_buffers.len - 1;
-                editor.completing = false;
               }
             } else {
               buffer_move_left_word(editor_current_buffer(&editor), is_shift_pressed);
@@ -485,7 +470,6 @@ i32 main(i32 argc, char **argv) {
                   ++editor.current_main_buffer_index;
                 else
                   editor.current_main_buffer_index = 0;
-                editor.completing = false;
               }
             } else {
               buffer_move_right_word(editor_current_buffer(&editor), is_shift_pressed);
@@ -530,6 +514,8 @@ i32 main(i32 argc, char **argv) {
                 buffer_move_down(editor_current_buffer(&editor),
                                  is_shift_pressed,
                                  max_visual_line_len);
+
+                editor.completing = false;
               }
             }
           } else if (editor.mode == JetModeCommandPalette) {
@@ -574,6 +560,8 @@ i32 main(i32 argc, char **argv) {
                 buffer_move_up(editor_current_buffer(&editor),
                                is_shift_pressed,
                                max_visual_line_len);
+
+                editor.completing = false;
               }
             }
           } else if (editor.mode == JetModeCommandPalette) {
@@ -807,11 +795,11 @@ i32 main(i32 argc, char **argv) {
                 for (u32 i = 0; i < selection.len; ++i) {
                   if (selection.ptr[i] == '\n') {
                     editor_update_inline_errors_before_action(&editor, ActionRemoveLineAtCursor);
-                    editor_update_completions_before_action(&editor, ActionRemoveLineAtCursor, 0);
+                    editor_update_completions_before_action(&editor, ActionRemoveLineAtCursor);
                     highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineAtCursor);
                   } else {
                     editor_update_inline_errors_before_action(&editor, ActionRemoveAtCursor);
-                    editor_update_completions_before_action(&editor, ActionRemoveAtCursor, 1);
+                    editor_update_completions_before_action(&editor, ActionRemoveAtCursor);
                     highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveAtCursor);
                   }
                 }
@@ -870,8 +858,7 @@ i32 main(i32 argc, char **argv) {
             handle_selection_deletion(&editor, &CURRENT_MAIN_BUFFER());
 
             editor_update_inline_errors_before_action(&editor, ActionInsert);
-            editor_update_completions_before_action(&editor, ActionInsert,
-                                                    event.as._char._char);
+            editor_update_completions_before_action(&editor, ActionInsert);
             highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
           }
 
@@ -927,7 +914,7 @@ i32 main(i32 argc, char **argv) {
           if (_char == U'\n') {
             if (editor.mode == JetModeEditor) {
               editor_update_inline_errors_before_action(&editor, ActionInsertLine);
-              editor_update_completions_before_action(&editor, ActionInsertLine, 0);
+              editor_update_completions_before_action(&editor, ActionInsertLine);
               highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsertLine);
             }
 
@@ -935,7 +922,7 @@ i32 main(i32 argc, char **argv) {
           } else {
             if (editor.mode == JetModeEditor) {
               editor_update_inline_errors_before_action(&editor, ActionInsert);
-              editor_update_completions_before_action(&editor, ActionInsert, _char);
+              editor_update_completions_before_action(&editor, ActionInsert);
               highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
             }
 

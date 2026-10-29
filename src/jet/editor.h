@@ -12,7 +12,6 @@ typedef Da(MessageEntry *) MessageEntryPtrs;
 
 typedef struct {
   WideStringBuilder wsb;
-  u32               col;
   u64               hash;
 } Completion;
 
@@ -83,8 +82,7 @@ void          editor_go_to_entry(Editor *editor, MessageEntry *entry);
 void          editor_update_inline_errors_before_action(Editor *editor, Action action);
 void          editor_build_completions(Editor *editor, u32 main_buffer_index);
 void          editor_update_completions_before_action(Editor *editor,
-                                                      Action action,
-                                                      u32 param);
+                                                      Action action);
 void          editor_update_before_buffer_action(Editor *editor,
                                                  BufferAction *action,
                                                  bool is_redo);
