@@ -919,6 +919,9 @@ i32 main(i32 argc, char **argv) {
               highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsertLine);
             }
 
+            if (editor.mode == JetModeEditor)
+              highlighter_redo_line(&CURRENT_MAIN_BUFFER(), prev_cursor_row);
+
             buffer_insert_new_line(buffer);
           } else {
             if (editor.mode == JetModeEditor) {
