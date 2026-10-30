@@ -394,13 +394,13 @@ void buffer_move_down(Buffer *buffer, bool is_selecting, u32 max_visual_line_len
   Line *line = buffer->lines.items + buffer->cursor_row;
   if (buffer->cursor_col + max_visual_line_len < line->len) {
     u32 rem = buffer->cursor_col % max_visual_line_len;
-    if (rem < ARRAY_LEN(LINE_WRAP_MARKER))
-      buffer->cursor_col += max_visual_line_len - rem - 1;
+    if (rem + 1 < ARRAY_LEN(LINE_WRAP_MARKER))
+      buffer->cursor_col += max_visual_line_len - rem - 2;
     else
-      buffer->cursor_col += max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
-  } else if (buffer->cursor_col + max_visual_line_len + 1 <
-             line->len + ARRAY_LEN(LINE_WRAP_MARKER)) {
-    buffer->cursor_col += max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
+      buffer->cursor_col += max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER) - 1;
+  } else if (buffer->cursor_col + max_visual_line_len - 1 <
+             line->len + ARRAY_LEN(LINE_WRAP_MARKER) + 1) {
+    buffer->cursor_col += max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER) - 1;
   } else if (buffer->cursor_row + 1 < buffer->lines.len) {
     ++buffer->cursor_row;
 
@@ -428,8 +428,8 @@ void buffer_move_up(Buffer *buffer, bool is_selecting, u32 max_visual_line_len) 
 
   buffer->is_selecting = is_selecting;
 
-  if (buffer->cursor_col > max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER)) {
-    buffer->cursor_col -= max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER);
+  if (buffer->cursor_col > max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER) - 1) {
+    buffer->cursor_col -= max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER) - 1;
   } else if (buffer->cursor_row > 0) {
     --buffer->cursor_row;
 

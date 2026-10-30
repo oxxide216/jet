@@ -47,8 +47,8 @@
 #define CURRENT_HIGHLIGHTER()                                             \
   editor.main_buffers.items[editor.current_main_buffer_index].highlighter
 
-static u32 get_max_visual_line_len(WideStr line, WinxWindow *window, TextRenderer *tr) {
-  f32 editor_width = window->width - BUFFER_PADDING * 2.0;
+static u32 get_max_visual_line_len(WideStr line, WinxWindow *window, TextRenderer *tr, f32 x_offset) {
+  f32 editor_width = window->width - BUFFER_PADDING * 2.0 - x_offset;
   f32 line_width = tr_measure_text(tr, line.ptr, line.len);
   u32 space = U' ';
   f32 space_width = tr_measure_text(tr, &space, 1);
@@ -511,7 +511,8 @@ i32 main(i32 argc, char **argv) {
                   editor.completions_scroll = 0;
               } else {
                 WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
-                u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
+                u32 max_visual_line_len =
+                  get_max_visual_line_len(line, window, &tr, editor.x_offset);
                 buffer_move_down(editor_current_buffer(&editor),
                                  is_shift_pressed,
                                  max_visual_line_len);
@@ -557,7 +558,8 @@ i32 main(i32 argc, char **argv) {
                   editor.completions_scroll = editor.actual_completions.len - 1;
               } else {
                 WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
-                u32 max_visual_line_len = get_max_visual_line_len(line, window, &tr);
+                u32 max_visual_line_len =
+                  get_max_visual_line_len(line, window, &tr, editor.x_offset);
                 buffer_move_up(editor_current_buffer(&editor),
                                is_shift_pressed,
                                max_visual_line_len);
@@ -790,9 +792,17 @@ i32 main(i32 argc, char **argv) {
             Str selection = buffer_get_selection_str(buffer);
             if (selection.len > 0) {
               winx_set_clipboard_content(window, selection.ptr, selection.len);
-              free(selection.ptr);
 
               if (editor.mode == JetModeEditor) {
+                u32 prev_row = CURRENT_BUFFER().cursor_row;
+                u32 prev_col = CURRENT_BUFFER().cursor_col;
+
+                u32 unused0, unused1;
+                get_buffer_selection_bounds(&CURRENT_BUFFER(),
+                                            &CURRENT_BUFFER().cursor_row,
+                                            &CURRENT_BUFFER().cursor_col,
+                                            &unused0, &unused1);
+
                 for (u32 i = 0; i < selection.len; ++i) {
                   if (selection.ptr[i] == '\n') {
                     editor_update_inline_errors_before_action(&editor, ActionRemoveLineAtCursor);
@@ -804,7 +814,12 @@ i32 main(i32 argc, char **argv) {
                     highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveAtCursor);
                   }
                 }
+
+                CURRENT_BUFFER().cursor_row = prev_row;
+                CURRENT_BUFFER().cursor_col = prev_col;
               }
+
+              free(selection.ptr);
 
               buffer_remove_before_cursor(buffer);
 
@@ -1040,7 +1055,8 @@ i32 main(i32 argc, char **argv) {
       u32 len = swprintf((i32 *) buffer, ARRAY_LEN(buffer), L"%u",
                          editor.max_visible_line_number);
 
-      f32 x_offset = tr_measure_text(&tr, buffer, len);
+      f32 line_num_width = tr_measure_text(&tr, buffer, len);
+      editor.x_offset = line_num_width + BUFFER_PADDING * 2.0;
 
       u32 space = U' ';
       f32 space_width = tr_measure_text(&tr, &space, 1);
@@ -1053,17 +1069,19 @@ i32 main(i32 argc, char **argv) {
 
         tr_set_fg_color(&tr, GREY_COLOR);
         static_assert(sizeof(u32) == sizeof(wchar_t));
-        len = swprintf((i32 *) buffer, ARRAY_LEN(buffer), L"%u", i + 1);
+        u32 len = swprintf((i32 *) buffer, ARRAY_LEN(buffer), L"%u", i + 1);
         f32 width = tr_measure_text(&tr, buffer, len);
-        tr_draw_text(&tr, buffer, len, BUFFER_PADDING * 2.0 + (x_offset - width) / 2.0, y);
+        tr_draw_text(&tr, buffer, len,
+                     BUFFER_PADDING * 2.0 +
+                     (line_num_width - width) / 2.0,
+                     y);
 
         tr_set_fg_color(&tr, FG_COLOR);
         WideStr line = buffer_get_line(&CURRENT_BUFFER(), i);
         f32 x;
         f32 new_y = tr_draw_line(&tr, line.ptr, line.len,
-                                 BUFFER_PADDING * 4.0 + x_offset, y,
-                                 window->width - BUFFER_PADDING * 2.0,
-                                 &x);
+                                 BUFFER_PADDING * 2.0 + editor.x_offset, y,
+                                 window->width - BUFFER_PADDING * 2.0, &x);
         if (new_y >= window->height - (f32) editor.font_scale - BUFFER_PADDING * 3.0)
           break;
         y = new_y;

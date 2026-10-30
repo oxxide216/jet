@@ -54,6 +54,7 @@ struct Editor {
   JetMode mode;
 
   u32 font_scale;
+  f32 x_offset;
 
   CnsConnection  *jwrap;
   MessageEntries  errors;
