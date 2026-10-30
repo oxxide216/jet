@@ -428,7 +428,7 @@ void buffer_move_up(Buffer *buffer, bool is_selecting, u32 max_visual_line_len) 
 
   buffer->is_selecting = is_selecting;
 
-  if (buffer->cursor_col > max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER) - 1) {
+  if (buffer->cursor_col >= max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER) - 1) {
     buffer->cursor_col -= max_visual_line_len - ARRAY_LEN(LINE_WRAP_MARKER) - 1;
   } else if (buffer->cursor_row > 0) {
     --buffer->cursor_row;
