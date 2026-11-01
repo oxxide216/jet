@@ -350,6 +350,21 @@ void editor_update_completions_before_action(Editor *editor, Action action) {
     }
   } break;
 
+  case ActionInsert:             break;
+  case ActionRemoveBeforeCursor: break;
+  case ActionRemoveAtCursor:     break;
+  }
+}
+
+void editor_update_completions_after_action(Editor *editor, Action action) {
+  MainBuffer *main_buffer =
+    editor->main_buffers.items + editor->current_main_buffer_index;
+
+  switch (action) {
+  case ActionInsertLine:             break;
+  case ActionRemoveLineBeforeCursor: break;
+  case ActionRemoveLineAtCursor:     break;
+
   case ActionInsert:
   case ActionRemoveBeforeCursor:
   case ActionRemoveAtCursor: {

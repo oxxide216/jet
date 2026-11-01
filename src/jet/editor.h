@@ -84,6 +84,8 @@ void          editor_update_inline_errors_before_action(Editor *editor, Action a
 void          editor_build_completions(Editor *editor, u32 main_buffer_index);
 void          editor_update_completions_before_action(Editor *editor,
                                                       Action action);
+void          editor_update_completions_after_action(Editor *editor,
+                                                     Action action);
 void          editor_update_before_buffer_action(Editor *editor,
                                                  BufferAction *action,
                                                  bool is_redo);

@@ -383,6 +383,7 @@ i32 main(i32 argc, char **argv) {
                   buffer_insert(editor_current_buffer(&editor), ' ');
                 }
 
+                editor_update_completions_after_action(&editor, ActionInsert);
                 highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
               }
             } else if (editor.mode == JetModeCommandPalette) {
@@ -404,15 +405,17 @@ i32 main(i32 argc, char **argv) {
                           &CURRENT_BUFFER().cursor_col,
                           &editor.search_buffer);
           } else {
-            handle_selection_deletion(&editor, &CURRENT_MAIN_BUFFER());
+            if (editor.mode == JetModeEditor) {
+              handle_selection_deletion(&editor, &CURRENT_MAIN_BUFFER());
 
-            if (CURRENT_BUFFER().cursor_col == 0) {
-              editor_update_inline_errors_before_action(&editor, ActionRemoveLineBeforeCursor);
-              editor_update_completions_before_action(&editor, ActionRemoveLineBeforeCursor);
-              highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineBeforeCursor);
-            } else {
-              editor_update_inline_errors_before_action(&editor, ActionRemoveBeforeCursor);
-              editor_update_completions_before_action(&editor, ActionRemoveBeforeCursor);
+              if (CURRENT_BUFFER().cursor_col == 0) {
+                editor_update_inline_errors_before_action(&editor, ActionRemoveLineBeforeCursor);
+                editor_update_completions_before_action(&editor, ActionRemoveLineBeforeCursor);
+                highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineBeforeCursor);
+              } else {
+                editor_update_inline_errors_before_action(&editor, ActionRemoveBeforeCursor);
+                editor_update_completions_before_action(&editor, ActionRemoveBeforeCursor);
+              }
             }
 
             if (is_ctrl_pressed)
@@ -420,20 +423,25 @@ i32 main(i32 argc, char **argv) {
             else
               buffer_remove_before_cursor(editor_current_buffer(&editor));
 
-            highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
+            if (editor.mode == JetModeEditor) {
+              editor_update_completions_after_action(&editor, ActionInsert);
+              highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
+            }
           }
         } break;
 
         case WinxKeyCodeDelete: {
-          handle_selection_deletion(&editor, &CURRENT_MAIN_BUFFER());
+          if (editor.mode == JetModeEditor) {
+            handle_selection_deletion(&editor, &CURRENT_MAIN_BUFFER());
 
-          WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
-          if (CURRENT_BUFFER().cursor_col == line.len) {
-            editor_update_inline_errors_before_action(&editor, ActionRemoveLineAtCursor);
-            highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineAtCursor);
-          } else {
-            editor_update_inline_errors_before_action(&editor, ActionRemoveAtCursor);
-            editor_update_completions_before_action(&editor, ActionRemoveAtCursor);
+            WideStr line = buffer_get_current_line(&CURRENT_BUFFER());
+            if (CURRENT_BUFFER().cursor_col == line.len) {
+              editor_update_inline_errors_before_action(&editor, ActionRemoveLineAtCursor);
+              highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveLineAtCursor);
+            } else {
+              editor_update_inline_errors_before_action(&editor, ActionRemoveAtCursor);
+              editor_update_completions_before_action(&editor, ActionRemoveAtCursor);
+            }
           }
 
           if (is_ctrl_pressed)
@@ -441,7 +449,10 @@ i32 main(i32 argc, char **argv) {
           else
             buffer_remove_at_cursor(editor_current_buffer(&editor));
 
-          highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
+          if (editor.mode == JetModeEditor) {
+            editor_update_completions_after_action(&editor, ActionInsert);
+            highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
+          }
         } break;
 
         case WinxKeyCodeLeft: {
@@ -880,8 +891,10 @@ i32 main(i32 argc, char **argv) {
 
           buffer_insert(editor_current_buffer(&editor), event.as._char._char);
 
-          if (editor.mode == JetModeEditor)
+          if (editor.mode == JetModeEditor) {
+            editor_update_completions_after_action(&editor, ActionInsert);
             highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
+          }
 #if AUTOCOMPLETION
           if (editor.mode == JetModeEditor) {
             if (!editor.completing)
