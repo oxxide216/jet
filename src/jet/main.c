@@ -375,16 +375,47 @@ i32 main(i32 argc, char **argv) {
                     editor.completions_scroll = 0;
                 }
               } else {
-                for (u32 i = 0; i < SPACES_PER_TAB; ++i) {
-                  editor_update_inline_errors_before_action(&editor, ActionInsert);
-                  editor_update_completions_before_action(&editor, ActionInsert);
-                  highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
+                if (is_shift_pressed) {
+                  u32 prev_col = CURRENT_BUFFER().cursor_col;
+                  CURRENT_BUFFER().cursor_col = 0;
 
-                  buffer_insert(editor_current_buffer(&editor), ' ');
+                  u32 diff = 0;
+
+                  Buffer *buffer = editor_current_buffer(&editor);
+                  for (u32 i = 0;
+                       i < SPACES_PER_TAB &&
+                       buffer_get_char_at_cursor(buffer) == ' ';
+                       ++i) {
+                    editor_update_inline_errors_before_action(&editor, ActionRemoveAtCursor);
+                    editor_update_completions_before_action(&editor, ActionRemoveAtCursor);
+                    highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionRemoveAtCursor);
+
+                    buffer_remove_at_cursor(buffer);
+
+                    ++diff;
+                  }
+
+                  editor_update_completions_after_action(&editor, ActionRemoveAtCursor);
+                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
+
+                  CURRENT_BUFFER().cursor_col = prev_col - diff;
+                } else {
+                  u32 prev_col = CURRENT_BUFFER().cursor_col;
+                  CURRENT_BUFFER().cursor_col = 0;
+
+                  for (u32 i = 0; i < SPACES_PER_TAB; ++i) {
+                    editor_update_inline_errors_before_action(&editor, ActionInsert);
+                    editor_update_completions_before_action(&editor, ActionInsert);
+                    highlighter_update_before_action(&CURRENT_MAIN_BUFFER(), ActionInsert);
+
+                    buffer_insert(editor_current_buffer(&editor), ' ');
+                  }
+
+                  editor_update_completions_after_action(&editor, ActionInsert);
+                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
+
+                  CURRENT_BUFFER().cursor_col = prev_col + SPACES_PER_TAB;
                 }
-
-                editor_update_completions_after_action(&editor, ActionInsert);
-                highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
               }
             } else if (editor.mode == JetModeCommandPalette) {
               if (editor.selected_option < editor.options.len) {

@@ -886,6 +886,13 @@ u32 buffer_get_rows(Buffer *buffer) {
   return buffer->lines.len;
 }
 
+u32 buffer_get_char_at_cursor(Buffer *buffer) {
+  Line *line = buffer->lines.items + buffer->cursor_row;
+  if (buffer->cursor_col == line->len)
+    return U'\0';
+  return line->items[buffer->cursor_col];
+}
+
 WideStr buffer_get_word_at_cursor(Buffer *buffer) {
   WideStr result = buffer_get_current_line(buffer);
   u32 line_len = result.len;
