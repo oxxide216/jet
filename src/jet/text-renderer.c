@@ -184,7 +184,7 @@ static void get_char_data(Atlas *atlas, u32 _char, u32 scale,
     *out_height = o_height;
 }
 
-static void get_char_mapping(Atlas *atlas, u32 _char, u32 scale,
+static void get_char_mapping(Atlas *atlas, u32 _char,
                              f32 *out_tl_u, f32 *out_tl_v,
                              f32 *out_br_u, f32 *out_br_v) {
   for (u32 i = 0; i < atlas->glyph_mappings_cache.len; ++i) {
@@ -352,7 +352,7 @@ f32 tr_draw_line(TextRenderer *tr, u32 *text, u32 text_len,
     get_char_data(tr->atlas, text[i], tr->scale,
                   &text_entry.x, &x, &text_entry.y,
                   &text_entry.w, &text_entry.h);
-    get_char_mapping(tr->atlas, text[i], tr->scale,
+    get_char_mapping(tr->atlas, text[i],
                      &text_entry.tl_u, &text_entry.tl_v,
                      &text_entry.br_u, &text_entry.br_v);
 
@@ -449,7 +449,7 @@ void tr_draw_text(TextRenderer *tr, u32 *text, u32 text_len, f32 x, f32 y) {
     get_char_data(tr->atlas, text[i], tr->scale,
                   &text_entry.x, &x, &text_entry.y,
                   &text_entry.w, &text_entry.h);
-    get_char_mapping(tr->atlas, text[i], tr->scale,
+    get_char_mapping(tr->atlas, text[i],
                      &text_entry.tl_u, &text_entry.tl_v,
                      &text_entry.br_u, &text_entry.br_v);
     if (text_entry.x >= tr->x_lower_limit &&
