@@ -43,6 +43,8 @@ static u32 copy_file_as_c(char *src_path, FILE *dest) {
       break;
   }
 
+  fclose(src);
+
   return size;
 }
 

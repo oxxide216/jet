@@ -207,8 +207,6 @@ static void get_char_mapping(Atlas *atlas, u32 _char, u32 scale,
   u8 *bitmap = stbtt_GetCodepointSDF(&atlas->font, scale_y, _char, 0, ONEDGE_VALUE,
                                      PIXEL_DIST_SCALE, &width, &height, NULL, NULL);
 
-  scale_y = stbtt_ScaleForPixelHeight(&atlas->font, scale);
-
   // Resetting in case we zoomed in/out too many times
   if (atlas->cursor_x + width + ATLAS_PADDING > ATLAS_WIDTH) {
     atlas->cursor_x = 0;
