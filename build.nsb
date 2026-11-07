@@ -19,10 +19,9 @@ cflags = $cflags
 incpath = $build_dir
 
 [$build_dir/assets.c]
-type = custom
-cmd = ./bundler $build_dir/assets.c $shader_spvs $fonts
-src = shaders/*
-deps = bundler $shader_spvs
+type = bundle
+src = $fonts
+deps = $shader_spvs
 
 [$build_dir/shaders/text.vert.spv]
 type = custom
@@ -63,11 +62,6 @@ src = shaders/circle.vert
 type = custom
 cmd = glslc -o $build_dir/shaders/circle.frag.spv shaders/circle.frag
 src = shaders/circle.frag
-
-[bundler]
-src = src/bundler/**.c
-cflags = $cflags
-incpath = $build_dir
 
 [viking]
 type = custom

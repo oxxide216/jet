@@ -20,6 +20,8 @@
 #define SHL_STR_IMPLEMENTATION
 #include "shl/shl-str.h"
 
+#define ASTR(name) ((Str) { (char *) name, name##_len })
+
 #define CURRENT_MAIN_BUFFER()                                 \
   editor.main_buffers.items[editor.current_main_buffer_index]
 
@@ -171,37 +173,37 @@ i32 main(i32 argc, char **argv) {
   VikInstance *instance = vik_make_instance(window, VikRequestFlagsNone, false);
   VikExecutor *executor = vik_make_executor(instance);
 
-  Atlas atlas = atlas_make(instance, fonts_JetBrainsMono_Medium_ttf);
+  Atlas atlas = atlas_make(instance, ASTR(fonts_JetBrainsMono_Medium_ttf));
 
   TextRenderer tr = tr_make(window, instance, executor,
                             &atlas,
-                            build_shaders_text_vert_spv,
-                            build_shaders_text_frag_spv,
-                            build_shaders_sel_vert_spv,
-                            build_shaders_sel_frag_spv);
+                            ASTR(build_shaders_text_vert_spv),
+                            ASTR(build_shaders_text_frag_spv),
+                            ASTR(build_shaders_sel_vert_spv),
+                            ASTR(build_shaders_sel_frag_spv));
   tr_resize(&tr, window->width, window->height);
 
   TextRenderer str = tr_make(window, instance, executor,
                              &atlas,
-                             build_shaders_text_vert_spv,
-                             build_shaders_text_frag_spv,
-                             build_shaders_sel_vert_spv,
-                             build_shaders_sel_frag_spv);
+                             ASTR(build_shaders_text_vert_spv),
+                             ASTR(build_shaders_text_frag_spv),
+                             ASTR(build_shaders_sel_vert_spv),
+                             ASTR(build_shaders_sel_frag_spv));
   tr_resize(&str, window->width, window->height);
 
   TextRenderer ptr = tr_make(window, instance, executor,
                              &atlas,
-                             build_shaders_text_vert_spv,
-                             build_shaders_text_frag_spv,
-                             build_shaders_sel_vert_spv,
-                             build_shaders_sel_frag_spv);
+                             ASTR(build_shaders_text_vert_spv),
+                             ASTR(build_shaders_text_frag_spv),
+                             ASTR(build_shaders_sel_vert_spv),
+                             ASTR(build_shaders_sel_frag_spv));
   tr_resize(&ptr, window->width, window->height);
 
   ShapeRenderer sr = sr_make(instance, executor,
-                            build_shaders_shape_vert_spv,
-                            build_shaders_shape_frag_spv,
-                            build_shaders_circle_vert_spv,
-                            build_shaders_circle_frag_spv);
+                            ASTR(build_shaders_shape_vert_spv),
+                            ASTR(build_shaders_shape_frag_spv),
+                            ASTR(build_shaders_circle_vert_spv),
+                            ASTR(build_shaders_circle_frag_spv));
   sr_resize(&sr, window->width, window->height);
 
   Editor editor = {0};

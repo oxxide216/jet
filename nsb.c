@@ -121,6 +121,7 @@ typedef enum {
   TypeStaticLib,
   TypeSharedLib,
   TypeCustom,
+  TypeBundle,
 } Type;
 
 typedef struct TargetBuildInfo TargetBuildInfo;
@@ -238,7 +239,7 @@ static bool parse_args(u32 argc, char **argv) {
       printf("[ERROR] Unknown flag: %s\n", argv[i]);
       return false;
     } else {
-      config.build_file_dir = argv[1];
+      config.build_file_dir = argv[i];
     }
   }
 
@@ -555,6 +556,8 @@ static bool parse_target(Parser *parser) {
         type = TypeSharedLib;
       } else if (str_eq(value, STR_LIT("custom"))) {
         type = TypeCustom;
+      } else if (str_eq(value, STR_LIT("bundle"))) {
+        type = TypeBundle;
       } else {
         parser->row = value_row;
         parser->col = value_col;
@@ -564,6 +567,8 @@ static bool parse_target(Parser *parser) {
         fprintf(stderr, "    executable\n");
         fprintf(stderr, "    static_lib\n");
         fprintf(stderr, "    shared_lib\n");
+        fprintf(stderr, "    custom\n");
+        fprintf(stderr, "    bundle\n");
         return false;
       }
 
@@ -707,6 +712,7 @@ static char *get_target_type_str(Type type) {
   case TypeStaticLib:  return "static_lib";
   case TypeSharedLib:  return "shared_lib";
   case TypeCustom:     return "custom";
+  case TypeBundle:     return "bundle";
   }
 
   fprintf(stderr, "UNREACHABLE\n");
@@ -996,7 +1002,7 @@ static Str get_target_full_file(Str file, Type type) {
     memcpy(full_file.ptr + 3, file.ptr, file.len);
     memcpy(full_file.ptr + 3 + file.len, ext.ptr, ext.len);
     return full_file;
-  } else if (type == TypeCustom) {
+  } else if (type == TypeCustom || type == TypeBundle) {
     Str full_file;
     full_file.len = file.len;
     full_file.ptr = malloc(full_file.len);
@@ -1639,6 +1645,56 @@ static void create_gitignore_file(Str prefix) {
   free(full_path.ptr);
 }
 
+static u32 copy_file_as_c(char *src_path, FILE *dest) {
+  FILE *src = fopen(src_path, "rb");
+  if (!src) {
+    fprintf(stderr, "[ERROR] Could not read %s\n", src_path);
+    return (u32) -1;
+  }
+
+  u32 len = strlen(src_path);
+  char *name = alloca(len + 1);
+  for (u32 i = 0; i < len; ++i) {
+    if (src_path[i] == '/' || src_path[i] == '.' || src_path[i] == '-')
+      name[i] = '_';
+    else
+      name[i] = src_path[i];
+  }
+  name[len] = '\0';
+
+  fprintf(dest, "unsigned char %s[] = {\n", name);
+
+  u8 buffer[1024];
+  u32 size = 0;
+
+  while (true) {
+    u64 n = fread(buffer, 1, sizeof(buffer), src);
+    if (n > 0) {
+      for (u32 i = 0; i < n; ++i) {
+        if (size == 0 && i == 0) {
+          fprintf(dest, "  ");
+        } else {
+          fputc(',', dest);
+          if (i % 10 == 0)
+            fprintf(dest, "\n  ");
+          else
+            fputc(' ', dest);
+        }
+        fprintf(dest, "0x%02x", buffer[i]);
+      }
+      size += n;
+    }
+    if (n < sizeof(buffer))
+      break;
+  }
+
+  fprintf(dest, "\n};\nunsigned int %s_len = %u;", name, size);
+
+  fclose(src);
+
+  return size;
+}
+
 static BuildResult build(BuildConfig *build_config, Target *target) {
   TargetBuildInfo *info = target->info;
   if (!info) {
@@ -1699,21 +1755,73 @@ static BuildResult build(BuildConfig *build_config, Target *target) {
     }
   }
 
-  char *cmd;
-  if (info->type == TypeExecutable) {
+  char *cmd = NULL;
+  switch (info->type) {
+  case TypeExecutable: {
     if (info->incpath.len > 0)
       cmd = get_inc_executable_target_build_cmd(info);
     else
       cmd = get_full_executable_target_build_cmd(info);
-  } else if (info->type == TypeStaticLib) {
+  } break;
+
+  case TypeStaticLib: {
     cmd = get_static_lib_target_build_cmd(info);
-  } else if (info->type == TypeSharedLib) {
+  } break;
+
+  case TypeSharedLib: {
     if (info->incpath.len > 0)
       cmd = get_inc_shared_lib_target_build_cmd(info);
     else
       cmd = get_full_shared_lib_target_build_cmd(info);
-  } else if (info->type == TypeCustom) {
+  } break;
+
+  case TypeCustom: {
     cmd = get_custom_target_build_cmd(info);
+  } break;
+
+  case TypeBundle: {
+    printf("[INFO] Bundling target %.*s\n", info->file.len, info->file.ptr);
+
+    char *path = alloca(info->file.len + 1);
+    memcpy(path, info->file.ptr, info->file.len);
+    path[info->file.len] = '\0';
+
+    FILE *file = fopen(path, "w");
+    if (!file) {
+      fprintf(stderr, "[ERROR] Could not write %s\n", path);
+      return BuildResultFail;
+    }
+
+    for (u32 i = 0; i < info->srcs.len; ++i) {
+      if (i > 0)
+        fputs("\n\n", file);
+
+      Str _path = info->srcs.items[i];
+      char *path = alloca(_path.len + 1);
+      memcpy(path, _path.ptr, _path.len);
+      path[_path.len] = '\0';
+
+      if (copy_file_as_c(path, file) == (u32) -1)
+        return BuildResultFail;
+    }
+
+    for (u32 i = 0; i < info->deps.len; ++i) {
+      if (i > 0 || info->srcs.len > 0)
+        fputs("\n\n", file);
+
+      Str _path = info->deps.items[i].target->info->file;
+      char *path = alloca(_path.len + 1);
+      memcpy(path, _path.ptr, _path.len);
+      path[_path.len] = '\0';
+
+      if (copy_file_as_c(path, file) == (u32) -1)
+        return BuildResultFail;
+    }
+
+    fputc('\n', file);
+
+    fclose(file);
+  } break;
   }
 
   if (!cmd) {
