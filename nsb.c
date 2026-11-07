@@ -612,7 +612,9 @@ static bool parse_target(Parser *parser) {
 #endif
   }
 
-  if (target.type != TypeCustom && target.src_pattern.len == 0) {
+  if (target.type != TypeCustom &&
+      target.type != TypeBundle &&
+      target.src_pattern.len == 0) {
     fprintf(stderr, "[ERROR] Target %.*s does not have `src` field\n",
             target.file.len, target.file.ptr);
     return false;
