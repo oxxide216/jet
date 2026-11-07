@@ -1415,7 +1415,8 @@ static char *get_target_obj_build_cmd(TargetBuildInfo *info, u32 index) {
 }
 
 static char *get_inc_executable_target_build_cmd(TargetBuildInfo *info) {
-  if (!info->rebuild && !needs_rebuild_deps(&info->deps, info->file))
+  if (!info->rebuild &&
+      !needs_rebuild_deps(&info->deps, info->file))
     return NULL;
 
   make_directory(info->file, true);
@@ -1491,7 +1492,8 @@ static char *get_full_executable_target_build_cmd(TargetBuildInfo *info) {
 }
 
 static char *get_static_lib_target_build_cmd(TargetBuildInfo *info) {
-  if (!info->rebuild && !needs_rebuild_deps(&info->deps, info->file))
+  if (!info->rebuild &&
+      !needs_rebuild_deps(&info->deps, info->file))
     return NULL;
 
   Strs obj_paths = {0};
@@ -1521,7 +1523,8 @@ static char *get_static_lib_target_build_cmd(TargetBuildInfo *info) {
 }
 
 static char *get_inc_shared_lib_target_build_cmd(TargetBuildInfo *info) {
-  if (!info->rebuild && !needs_rebuild_deps(&info->deps, info->file))
+  if (!info->rebuild &&
+      !needs_rebuild_deps(&info->deps, info->file))
     return NULL;
 
   Strs obj_paths = {0};
@@ -1780,6 +1783,11 @@ static BuildResult build(BuildConfig *build_config, Target *target) {
   } break;
 
   case TypeBundle: {
+    if (!info->rebuild &&
+        !needs_rebuild_many_srcs(&info->srcs, info->file) &&
+        !needs_rebuild_deps(&info->deps, info->file))
+      break;
+
     printf("[INFO] Bundling target %.*s\n", info->file.len, info->file.ptr);
 
     char *path = alloca(info->file.len + 1);
@@ -1821,6 +1829,9 @@ static BuildResult build(BuildConfig *build_config, Target *target) {
     fputc('\n', file);
 
     fclose(file);
+
+    info->build_result = BuildResultOk;
+    return BuildResultOk;
   } break;
   }
 
