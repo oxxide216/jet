@@ -190,6 +190,7 @@ static void get_char_mapping(Atlas *atlas, u32 _char,
   for (u32 i = 0; i < atlas->glyph_mappings_cache.len; ++i) {
     GlyphMapping *mapping = atlas->glyph_mappings_cache.items + i;
     if (mapping->_char == _char) {
+      if (out_tl_u)
         *out_tl_u = mapping->tl_u;
       if (out_tl_v)
         *out_tl_v = mapping->tl_v;
