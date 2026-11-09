@@ -6,8 +6,13 @@
 
 extern HighlighterInfo c_highlighter_info;
 extern HighlighterInfo rust_highlighter_info;
+extern HighlighterInfo e_highlighter_info;
 
-static HighlighterInfo *infos[] = { &c_highlighter_info, &rust_highlighter_info };
+static HighlighterInfo *infos[] = {
+  &c_highlighter_info,
+  &rust_highlighter_info,
+  &e_highlighter_info,
+};
 
 void highlighter_do_main_buffer(MainBuffer *buffer) {
   buffer->highlighter.info = NULL;
