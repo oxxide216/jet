@@ -400,7 +400,7 @@ i32 main(i32 argc, char **argv) {
                   editor_update_completions_after_action(&editor, ActionRemoveAtCursor);
                   highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
 
-                  CURRENT_BUFFER().cursor_col = prev_col - diff;
+                  CURRENT_BUFFER().cursor_col = prev_col < diff ? 0 : prev_col - diff;
                 } else {
                   u32 prev_col = CURRENT_BUFFER().cursor_col;
                   CURRENT_BUFFER().cursor_col = 0;
