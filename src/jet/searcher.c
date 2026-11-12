@@ -26,7 +26,7 @@ bool searcher_next_match(Searcher *searcher, u32 *row, u32 *col, bool add_to_his
   u32 temp_col = *col + 1;
   for (u32 i = *row; i < rows; ++i) {
     WideStr line = buffer_get_line(searcher->buffer, i);
-    for (u32 j = temp_col; j + searcher->pattern.len < line.len; ++j) {
+    for (u32 j = temp_col; j + searcher->pattern.len - 1 < line.len; ++j) {
       WideStr sub_line = { line.ptr + j, searcher->pattern.len };
       if (wide_str_eq(sub_line, searcher->pattern)) {
         if (add_to_historty) {
