@@ -23,6 +23,7 @@ static Keyword keywords[] = {
   { WSTR_LIT(U"as"), KW_COLOR },
   { WSTR_LIT(U"lenof"), KW_COLOR },
   { WSTR_LIT(U"struct"), KW_COLOR },
+  { WSTR_LIT(U"sizeof"), KW_COLOR },
   { WSTR_LIT(U"bool"), TYPE_COLOR },
   { WSTR_LIT(U"s8"), TYPE_COLOR },
   { WSTR_LIT(U"s16"), TYPE_COLOR },
