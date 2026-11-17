@@ -87,9 +87,8 @@ void highlighter_redo_line(MainBuffer *buffer, u32 row) {
     WideStr line = buffer_get_line(&buffer->buffer, row);
     for (u32 i = 0; i < line.len; ++i) {
       if (iswspace(line.ptr[i])) {
-        while (i == line.len || iswspace(line.ptr[i]))
+        while (i < line.len && iswspace(line.ptr[i]))
           ++i;
-        --i;
       }
 
       WideStr sub_line = { line.ptr + i, line.len - i };

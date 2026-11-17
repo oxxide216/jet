@@ -15,6 +15,9 @@ void searcher_update_pattern(Searcher *searcher, WideStr pattern) {
   };
   DA_APPEND(searcher->history, item);
 
+  if (searcher->pattern.ptr)
+    free(searcher->pattern.ptr);
+
   searcher->pattern.len = pattern.len;
   searcher->pattern.ptr = malloc(searcher->pattern.len * sizeof(*searcher->pattern.ptr));
   memcpy(searcher->pattern.ptr, pattern.ptr,
