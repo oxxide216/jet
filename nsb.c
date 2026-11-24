@@ -1,3 +1,5 @@
+// TODO: multithreaded builds do not support Windows for now
+
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
@@ -9,6 +11,7 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <pthread.h>
 #endif
 
 #define BUILD_FILE_NAME "build.nsb"
@@ -153,10 +156,29 @@ typedef struct {
 
 typedef Da(Dep) Deps;
 
+typedef enum {
+  ThreadStatusDidntStart = 0,
+  ThreadStatusRunning,
+  ThreadStatusSuccess,
+  ThreadStatusFailure,
+} ThreadStatus;
+
 typedef struct {
-  Str     content;
-  Vars    vars;
-  Targets targets;
+  char         *cmd;
+  ThreadStatus  status;
+} ThreadCtx;
+
+typedef struct {
+  u32        count;
+  ThreadCtx *ctxs;
+  pthread_t *threads;
+} ThreadPool;
+
+typedef struct {
+  Str        content;
+  Vars       vars;
+  Targets    targets;
+  ThreadPool tp;
 } BuildConfig;
 
 typedef struct {
@@ -246,6 +268,84 @@ static bool parse_args(u32 argc, char **argv) {
   return true;
 }
 
+#ifndef _WIN32
+static void *worker(void *arg) {
+  ThreadCtx *ctx = arg;
+
+  ctx->status = system(ctx->cmd) == 0 ? ThreadStatusSuccess : ThreadStatusFailure;
+
+  return NULL;
+}
+#endif
+
+static void tp_init(ThreadPool *tp) {
+#ifdef _WIN32
+  (void) tp;
+#else
+  tp->count = sysconf(_SC_NPROCESSORS_ONLN);
+  tp->ctxs = malloc(tp->count * sizeof(*tp->ctxs));
+  for (u32 i = 0; i < tp->count; ++i)
+    tp->ctxs[i].status = ThreadStatusDidntStart;
+  tp->threads = malloc(tp->count * sizeof(*tp->threads));
+#endif
+}
+
+static bool tp_run_cmd(ThreadPool *tp, char *cmd) {
+#ifdef _WIN32
+  (void) tp;
+
+  return system(cmd) == 0;
+#else
+  while (true) {
+    u32 index = (u32) -1;
+    for (u32 i = 0; i < tp->count; ++i) {
+      if (tp->ctxs[i].status != ThreadStatusRunning) {
+        index = i;
+        break;
+      }
+    }
+
+    if (index != (u32) -1) {
+      ThreadStatus status = tp->ctxs[index].status;
+      tp->ctxs[index].cmd = cmd;
+      tp->ctxs[index].status = ThreadStatusRunning;
+      pthread_create(tp->threads + index, NULL, worker, tp->ctxs + index);
+      return status != ThreadStatusFailure;
+    }
+
+    usleep(1000);
+  }
+#endif
+}
+
+static bool tp_wait(ThreadPool *tp) {
+#ifdef _WIN32
+  (void) tp;
+
+  return true;
+#else
+  bool result = true;
+
+  for (u32 i = 0; i < tp->count; ++i) {
+    if (tp->ctxs[i].status == ThreadStatusRunning) {
+      pthread_join(tp->threads[i], NULL);
+      result &= tp->ctxs[i].status != ThreadStatusFailure;
+    }
+  }
+
+  return result;
+#endif
+}
+
+static void tp_destroy(ThreadPool *tp) {
+#ifdef _WIN32
+  (void) tp;
+#else
+  free(tp->ctxs);
+  free(tp->threads);
+#endif
+}
+
 static void parser_destroy(Parser *parser) {
   (void) parser;
   // Empty for now
@@ -286,6 +386,7 @@ static void build_config_destroy(BuildConfig *build_config) {
       target_build_info_destroy(build_config->targets.items[i].info);
   if (build_config->targets.items)
     free(build_config->targets.items);
+  tp_destroy(&build_config->tp);
 }
 
 static void all_files_rec_destroy(void) {
@@ -1740,12 +1841,18 @@ static BuildResult build(BuildConfig *build_config, Target *target) {
     for (u32 i = 0; i < src_build_cmds.len; ++i) {
       if (config.verbose)
         printf("[INFO] Running %s\n", src_build_cmds.items[i]);
-      int result = system(src_build_cmds.items[i]);
-      free(src_build_cmds.items[i]);
-      if (result != 0)
+      bool result = tp_run_cmd(&build_config->tp, src_build_cmds.items[i]);
+      if (!result) {
         failed = true;
+        break;
+      }
     }
 
+    if (!failed && !tp_wait(&build_config->tp))
+      failed = true;
+
+    for (u32 i = 0; i < src_build_cmds.len; ++i)
+      free(src_build_cmds.items[i]);
     if (src_build_cmds.items)
       free(src_build_cmds.items);
 
@@ -1867,6 +1974,7 @@ i32 main(i32 argc, char **argv) {
 #endif
 
   BuildConfig build_config = {0};
+  tp_init(&build_config.tp);
   if (!parse_build_file(BUILD_FILE_NAME, &build_config)) {
     build_config_destroy(&build_config);
     return 1;
