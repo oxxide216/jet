@@ -879,6 +879,7 @@ i32 main(i32 argc, char **argv) {
             editor.completing = false;
           } else if (editor.mode == JetModeCommandPalette) {
             editor.mode = JetModeEditor;
+            editor_switch_main_buffer(&editor, editor.current_main_buffer_index);
           } else if (editor.mode == JetModeSearch) {
             bool iterated = false;
             while (searcher_undo(&editor.searcher,
