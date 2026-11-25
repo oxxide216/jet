@@ -27,6 +27,7 @@ typedef struct {
 
 extern Provider command_provider;
 extern Provider open_file_provider;
+extern Provider open_new_file_provider;
 extern Provider save_file_provider;
 extern Provider save_new_file_provider;
 extern Provider error_provider;
