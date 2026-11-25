@@ -250,9 +250,11 @@ void highlighter_update_before_action(MainBuffer *buffer, Action action) {
   switch (action) {
   case ActionInsertLine: {
     if (buffer->buffer.cursor_row < buffer->highlighter.states.len) {
-      DA_INSERT(buffer->highlighter.states,
-                buffer->buffer.cursor_row,
-                buffer->highlighter.states.items[buffer->buffer.cursor_row + 1]);
+      HighlighterState state =
+        buffer->buffer.cursor_row + 1 < buffer->highlighter.states.len ?
+        buffer->highlighter.states.items[buffer->buffer.cursor_row + 1] :
+        (HighlighterState) { HighlighterStateKindBasic, {} };
+      DA_INSERT(buffer->highlighter.states, buffer->buffer.cursor_row, state);
       DA_INSERT(buffer->highlighter.rangess, buffer->buffer.cursor_row, (ColorRanges) {0});
     } else {
       DA_APPEND(buffer->highlighter.states,
@@ -261,10 +263,14 @@ void highlighter_update_before_action(MainBuffer *buffer, Action action) {
     }
   } break;
 
-  case ActionRemoveLineBeforeCursor:
-  case ActionRemoveLineAtCursor: {
+  case ActionRemoveLineBeforeCursor: {
     DA_REMOVE_AT(buffer->highlighter.states, buffer->buffer.cursor_row);
     DA_REMOVE_AT(buffer->highlighter.rangess, buffer->buffer.cursor_row);
+  } break;
+
+  case ActionRemoveLineAtCursor: {
+    DA_REMOVE_AT(buffer->highlighter.states, buffer->buffer.cursor_row + 1);
+    DA_REMOVE_AT(buffer->highlighter.rangess, buffer->buffer.cursor_row + 1);
   } break;
 
   case ActionInsert:             break;

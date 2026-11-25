@@ -117,8 +117,8 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
     main_buffer_rebuild_entries(&main_buffer, editor);
     highlighter_do_main_buffer(&main_buffer);
     main_buffer.buffer.cursor_row = entry->row - 1;
-    if (main_buffer.buffer.cursor_row > buffer_get_rows(&main_buffer.buffer))
-      main_buffer.buffer.cursor_row = buffer_get_rows(&main_buffer.buffer);
+    if (main_buffer.buffer.cursor_row >= buffer_get_rows(&main_buffer.buffer))
+      main_buffer.buffer.cursor_row = buffer_get_rows(&main_buffer.buffer) - 1;
     main_buffer.buffer.cursor_col = entry->col - 1;
     WideStr line = buffer_get_current_line(&main_buffer.buffer);
     if (main_buffer.buffer.cursor_col > line.len)
@@ -129,8 +129,8 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
   } else {
     Buffer *buffer = &editor->main_buffers.items[editor->current_main_buffer_index].buffer;
     buffer->cursor_row = entry->row - 1;
-    if (buffer->cursor_row > buffer_get_rows(buffer))
-      buffer->cursor_row = buffer_get_rows(buffer);
+    if (buffer->cursor_row >= buffer_get_rows(buffer))
+      buffer->cursor_row = buffer_get_rows(buffer) - 1;
     buffer->cursor_col = entry->col - 1;
     WideStr line = buffer_get_current_line(buffer);
     if (buffer->cursor_col > line.len)

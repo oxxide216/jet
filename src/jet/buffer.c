@@ -167,8 +167,7 @@ static void buffer_remove_selection(Buffer *buffer) {
       min_col == buffer->anchor_col ?
       BufferActionKindRemoveBeforeCursor :
       BufferActionKindRemoveAtCursor;
-    buffer_add_undo(buffer, undo_kind, undo_data,
-                    buffer->cursor_row, buffer->cursor_col);
+    buffer_add_undo(buffer, undo_kind, undo_data, min_row, min_col);
 
     memmove(line->items + min_col,
             line->items + max_col,
@@ -185,12 +184,15 @@ static void buffer_remove_selection(Buffer *buffer) {
     line0->len = min_col;
 
     for (u32 i = min_row + 1; i < max_row; ++i) {
+      wsb_push_str(&undo_wsb, STR_LIT("\n"));
       WideStr line = buffer_get_line(buffer, min_row + 1);
       wsb_push_wstr(&undo_wsb, line);
       if (buffer->lines.items[min_row + 1].items)
         free(buffer->lines.items[min_row + 1].items);
       DA_REMOVE_AT(buffer->lines, min_row + 1);
     }
+
+    wsb_push_str(&undo_wsb, STR_LIT("\n"));
 
     Line *line1 = buffer->lines.items + min_row + 1;
 
@@ -210,8 +212,7 @@ static void buffer_remove_selection(Buffer *buffer) {
        min_row == buffer->anchor_row) ?
       BufferActionKindRemoveBeforeCursor :
       BufferActionKindRemoveAtCursor;
-    buffer_add_undo(buffer, undo_kind, undo_data,
-                    buffer->cursor_row, buffer->cursor_col);
+    buffer_add_undo(buffer, undo_kind, undo_data, min_row, min_col);
   }
   buffer->cursor_row = min_row;
   buffer->cursor_col = min_col;

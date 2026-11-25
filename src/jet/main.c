@@ -781,36 +781,36 @@ i32 main(i32 argc, char **argv) {
           if (is_ctrl_pressed) {
             if (is_shift_pressed) {
               Buffer *buffer = editor_current_buffer(&editor);
+              u32 prev_row;
 
               if (buffer->redos.len > 0) {
                 BufferAction *action = buffer->redos.items + buffer->redos.len - 1;
                 editor_update_before_buffer_action(&editor, action, true);
+
+                prev_row = buffer->redos.items[buffer->redos.len - 1].cursor_row;
               }
 
               buffer_redo(buffer);
 
-              if (editor.mode == JetModeEditor) {
-                if (CURRENT_BUFFER().cursor_row > 0)
-                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row - 1);
-                else
-                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
-              }
+              if (buffer->redos.len > 0 && editor.mode == JetModeEditor)
+                for (u32 i = prev_row; i < CURRENT_BUFFER().cursor_row; ++i)
+                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), i);
             } else {
               Buffer *buffer = editor_current_buffer(&editor);
+              u32 prev_row;
 
               if (buffer->undos.len > 0) {
                 BufferAction *action = buffer->undos.items + buffer->undos.len - 1;
                 editor_update_before_buffer_action(&editor, action, false);
+
+                prev_row = buffer->undos.items[buffer->undos.len - 1].cursor_row;
               }
 
               buffer_undo(buffer);
 
-              if (editor.mode == JetModeEditor) {
-                if (CURRENT_BUFFER().cursor_row > 0)
-                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row - 1);
-                else
-                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), CURRENT_BUFFER().cursor_row);
-              }
+              if (editor.mode == JetModeEditor)
+                for (u32 i = prev_row; i < CURRENT_BUFFER().cursor_row; ++i)
+                  highlighter_redo_line(&CURRENT_MAIN_BUFFER(), i);
             }
           }
         } break;
@@ -1078,7 +1078,8 @@ i32 main(i32 argc, char **argv) {
                                   &max_row, &max_col);
 
       if (editor.mode == JetModeSearch &&
-          searcher_has_succesful_searches_in_history(&editor.searcher))
+          searcher_has_succesful_searches_in_history(&editor.searcher) &&
+          editor.search_buffer.cursor_col > 0)
         max_col += editor.search_buffer.cursor_col - 1;
 
       tr_begin_frame(&tr, editor.font_scale,
