@@ -750,7 +750,7 @@ i32 main(i32 argc, char **argv) {
               DA_APPEND(editor.main_buffers, main_buffer);
             }
             if (editor.current_main_buffer_index > 0)
-              --editor.current_main_buffer_index;
+              editor_switch_main_buffer(&editor, editor.current_main_buffer_index - 1);
           }
         } break;
 
