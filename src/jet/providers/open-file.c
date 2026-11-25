@@ -18,13 +18,6 @@ static PaletteOptions get_opts(Editor *editor, WideStr content) {
 
   PaletteOptions result = {0};
 
-  PaletteOption option = {
-    { NEW_FILE_NAME, ARRAY_LEN(NEW_FILE_NAME) - 1 },
-    BG_COLOR,
-    FG_COLOR,
-  };
-  DA_APPEND(result, option);
-
   struct dirent *entry;
   while ((entry = readdir(dir))) {
     Str name = { entry->d_name, strlen(entry->d_name) };
@@ -35,20 +28,27 @@ static PaletteOptions get_opts(Editor *editor, WideStr content) {
       free(wide_name.ptr);
   }
 
+  PaletteOption option = {
+    { NEW_FILE_NAME, ARRAY_LEN(NEW_FILE_NAME) - 1 },
+    BG_COLOR,
+    FG_COLOR,
+  };
+  DA_APPEND(result, option);
+
   closedir(dir);
 
   return result;
 }
 
 static void free_opts(PaletteOptions options) {
-  for (u32 i = 1; i < options.len; ++i)
+  for (u32 i = 0; i + 1 < options.len; ++i)
     free(options.items[i].name.ptr);
   if (options.len > 0)
     free(options.items);
 }
 
 static bool execute(Editor *editor, PaletteOptions options, u32 index) {
-  if (index == 0) {
+  if (index + 1 == options.len) {
     editor->provider->free_opts(editor->options);
     editor->options.len = 0;
     editor->provider = &open_new_file_provider;
