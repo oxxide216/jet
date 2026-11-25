@@ -89,5 +89,6 @@ void          editor_update_completions_after_action(Editor *editor,
 void          editor_update_before_buffer_action(Editor *editor,
                                                  BufferAction *action,
                                                  bool is_redo);
+void          editor_switch_main_buffer(Editor *editor, u32 index);
 
 #endif // EDITOR_H

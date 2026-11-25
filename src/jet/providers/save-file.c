@@ -5,6 +5,7 @@
 
 #include "../provider.h"
 #include "../editor.h"
+#include "../platform.h"
 #include "../config.h"
 
 static PaletteOptions get_opts(Editor *editor, WideStr content) {
@@ -69,7 +70,7 @@ static bool execute(Editor *editor, PaletteOptions options, u32 index) {
     free(path);
     return true;
   } else {
-    chdir(path);
+    set_current_dir_cstr(path);
     editor->selected_option = 0;
 
     free(path);

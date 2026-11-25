@@ -6,6 +6,7 @@
 #include "../provider.h"
 #include "../editor.h"
 #include "../highlighter.h"
+#include "../platform.h"
 #include "../config.h"
 
 static PaletteOptions get_opts(Editor *editor, WideStr content) {
@@ -47,7 +48,6 @@ static bool execute(Editor *editor, PaletteOptions options, u32 index) {
 
   // Whether or not it is a regular file
   if (S_ISREG(stat_data.st_mode)) {
-    editor->current_main_buffer_index = editor->main_buffers.len;
     MainBuffer main_buffer = main_buffer_make(path);
     buffer_read_file(&main_buffer.buffer, path);
     main_buffer_rebuild_entries(&main_buffer, editor);
@@ -55,10 +55,11 @@ static bool execute(Editor *editor, PaletteOptions options, u32 index) {
     DA_APPEND(editor->main_buffers, main_buffer);
     editor_build_completions(editor, editor->main_buffers.len - 1);
     editor->completing = false;
+    editor_switch_main_buffer(editor, editor->main_buffers.len - 1);
 
     return true;
   } else {
-    chdir(path);
+    set_current_dir_cstr(path);
     editor->selected_option = 0;
 
     free(path);

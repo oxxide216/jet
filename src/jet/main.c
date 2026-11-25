@@ -231,6 +231,7 @@ i32 main(i32 argc, char **argv) {
 
       DA_APPEND(editor.main_buffers, main_buffer);
       editor_build_completions(&editor, editor.main_buffers.len - 1);
+      editor_switch_main_buffer(&editor, editor.main_buffers.len - 1);
     }
 
     free(cwd.ptr);
@@ -493,9 +494,9 @@ i32 main(i32 argc, char **argv) {
             if (is_alt_pressed) {
               if (editor.mode == JetModeEditor) {
                 if (editor.current_main_buffer_index > 0)
-                  --editor.current_main_buffer_index;
+                  editor_switch_main_buffer(&editor, editor.current_main_buffer_index - 1);
                 else
-                  editor.current_main_buffer_index = editor.main_buffers.len - 1;
+                  editor_switch_main_buffer(&editor, editor.main_buffers.len - 1);
               }
             } else {
               buffer_move_left_word(editor_current_buffer(&editor), is_shift_pressed);
@@ -512,9 +513,9 @@ i32 main(i32 argc, char **argv) {
             if (is_alt_pressed) {
               if (editor.mode == JetModeEditor) {
                 if (editor.current_main_buffer_index + 1 < editor.main_buffers.len)
-                  ++editor.current_main_buffer_index;
+                  editor_switch_main_buffer(&editor, editor.current_main_buffer_index + 1);
                 else
-                  editor.current_main_buffer_index = 0;
+                  editor_switch_main_buffer(&editor, 0);
               }
             } else {
               buffer_move_right_word(editor_current_buffer(&editor), is_shift_pressed);
@@ -710,10 +711,10 @@ i32 main(i32 argc, char **argv) {
 
         case WinxKeyCodeN: {
           if (is_ctrl_pressed && editor.mode == JetModeEditor) {
-            editor.current_main_buffer_index = editor.main_buffers.len;
             MainBuffer main_buffer = main_buffer_make(NULL);
             DA_APPEND(editor.main_buffers, main_buffer);
             editor_build_completions(&editor, editor.main_buffers.len - 1);
+            editor_switch_main_buffer(&editor, editor.main_buffers.len - 1);
           }
         } break;
 

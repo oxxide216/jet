@@ -7,6 +7,8 @@
 const char *get_socket_path_prefix(void);
 u32         get_process_id(void);
 Str         get_current_dir(void);
+void        set_current_dir(Str path);
+void        set_current_dir_cstr(char *path);
 void        remove_file(char *path);
 
 #endif // PLATFORM_H

@@ -106,7 +106,6 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
     char *new_rel_path = malloc(entry->file_path.len - (rel_path - path) + 1);
     strcpy(new_rel_path, rel_path);
 
-    editor->current_main_buffer_index = editor->main_buffers.len;
     MainBuffer main_buffer = main_buffer_make(new_rel_path);
     main_buffer.abs_file_path.len = entry->file_path.len;
     main_buffer.abs_file_path.ptr =
@@ -126,8 +125,8 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
       main_buffer.buffer.cursor_col = line.len;
     DA_APPEND(editor->main_buffers, main_buffer);
     editor_build_completions(editor, editor->main_buffers.len - 1);
+    editor_switch_main_buffer(editor, editor->main_buffers.len - 1);
   } else {
-    editor->current_main_buffer_index = main_buffer_index;
     Buffer *buffer = &editor->main_buffers.items[editor->current_main_buffer_index].buffer;
     buffer->cursor_row = entry->row - 1;
     if (buffer->cursor_row > buffer_get_rows(buffer))
@@ -136,6 +135,7 @@ void editor_go_to_entry(Editor *editor, MessageEntry *entry) {
     WideStr line = buffer_get_current_line(buffer);
     if (buffer->cursor_col > line.len)
       buffer->cursor_col = line.len;
+    editor_switch_main_buffer(editor, main_buffer_index);
   }
 }
 
@@ -479,4 +479,19 @@ void editor_update_before_buffer_action(Editor *editor,
 
   buffer->cursor_row = prev_cursor_row;
   buffer->cursor_col = prev_cursor_col;
+}
+
+void editor_switch_main_buffer(Editor *editor, u32 index) {
+  editor->current_main_buffer_index = index;
+  Str path = editor->main_buffers.items[index].abs_file_path;
+  if (path.len > 0) {
+    for (u32 i = path.len; i > 1; --i) {
+      if (path.ptr[i - 1] == '/') {
+        path.len = i - 1;
+        break;
+      }
+    }
+
+    set_current_dir(path);
+  }
 }

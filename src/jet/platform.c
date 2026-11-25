@@ -33,6 +33,18 @@ Str get_current_dir(void) {
   return result;
 }
 
+void set_current_dir(Str path) {
+  char *path_cstr = malloc(path.len + 1);
+  memcpy(path_cstr, path.ptr, path.len);
+  path_cstr[path.len] = '\0';
+  chdir(path_cstr);
+  free(path_cstr);
+}
+
+void set_current_dir_cstr(char *path) {
+  chdir(path);
+}
+
 void remove_file(char *path) {
   unlink(path);
 }
